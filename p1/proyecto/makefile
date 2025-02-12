@@ -9,7 +9,7 @@ _OBJ= tokenizador.o
 OBJ = $(patsubst %,$(LIBDIR)/%,$(_OBJ))
 
 all: 	src/main.cpp $(OBJ)
-		$(CC) $(OPTIONS) $(DEBUG) -I$(INCLUDEDIR) src/main.cpp $(OBJ) -o main
+		$(CC) $(OPTIONS) $(DEBUG) -I$(INCLUDEDIR) src/main.cpp $(OBJ) -o main.exe
 
 $(LIBDIR)/%.o : $(LIBDIR)/%.cpp $(INCLUDEDIR)/%.h
 	$(CC) $(OPTIONS) $(DEBUG) -c -I$(INCLUDEDIR) -o $@ $<
