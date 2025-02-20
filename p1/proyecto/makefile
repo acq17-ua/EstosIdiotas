@@ -8,8 +8,10 @@ INCLUDEDIR=include
 _OBJ= tokenizador.o
 OBJ = $(patsubst %,$(LIBDIR)/%,$(_OBJ))
 
-all: 	src/main.cpp $(OBJ)
-		$(CC) $(OPTIONS) $(DEBUG) -I$(INCLUDEDIR) src/main.cpp $(OBJ) -o main.exe
+all: practica1
+
+practica1: 	src/main.cpp $(OBJ)
+		$(CC) $(OPTIONS) $(DEBUG) -I$(INCLUDEDIR) src/main.cpp $(OBJ) -o practica1
 
 $(LIBDIR)/%.o : $(LIBDIR)/%.cpp $(INCLUDEDIR)/%.h
 	$(CC) $(OPTIONS) $(DEBUG) -c -I$(INCLUDEDIR) -o $@ $<
