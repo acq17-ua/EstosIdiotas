@@ -1,6 +1,8 @@
 #include "tokenizador.h"
 #include <iostream>
 #include <cstdlib>
+#include <string.h>
+#include <fstream>
 
 /////////
 // AUX //
@@ -58,8 +60,8 @@ Tokenizador& Tokenizador::operator= (const Tokenizador& t)
 	return *this;
 }
 
-void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const {
-
+void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
+{
 	string::size_type lastPos = str.find_first_not_of(this->delimiters, 0);
 	string::size_type pos = str.find_first_of(this->delimiters, lastPos);
 
@@ -73,12 +75,68 @@ void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const {
 
 bool Tokenizador::Tokenizar (const string& i, const string& f) const
 {
-	return false;
+	ifstream input;
+	ofstream output;
+	string contents;
+
+	input.open(i);
+	
+	if( !input ) {
+		cerr << "El archivo " << i << " no existe o no es accesible\n";
+		return false;
+	}
+
+	getline(input, contents);
+
+
+	list<string> tokens;
+	this->Tokenizar(contents, tokens);
+	
+	output.open(f);
+
+	if( !output ) {
+		cerr << "El archivo " << i << " no existe o no es accesible\n";
+		return false;
+	}
+	
+	list<string>::const_iterator it;
+	for (it=tokens.begin(); it!=tokens.end(); ++it)
+		output << it->c_str() << endl;
+
+	return true;
 }
 
 bool Tokenizador::Tokenizar (const string & i) const 
 {
-	return false;
+	ifstream input;
+	ofstream output;
+	string contents;
+
+	input.open(i);
+	
+	if( !input ) {
+		cerr << "El archivo " << i << " no existe o no es accesible\n";
+		return false;
+	}
+
+	getline(input, contents);
+	cout << "contents: " <<  contents << endl;
+
+	list<string> tokens;
+	this->Tokenizar(contents, tokens);
+	
+	output.open(i+".tk");
+
+	if( !output ) {
+		cerr << "El archivo " << i << " no existe o no es accesible\n";
+		return false;
+	}
+	
+	list<string>::const_iterator it;
+	for (it=tokens.begin(); it!=tokens.end(); ++it)
+		output << it->c_str() << endl;
+
+	return true;
 }
 
 // LA IMPORTANTE
