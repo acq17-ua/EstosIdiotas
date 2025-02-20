@@ -167,7 +167,7 @@ bool Tokenizador::Tokenizar (const string & i) const
 	ifstream input;
 	ofstream output;
 	string contents;
-
+		
 	input.open(i);
 	
 	if( !input ) {
@@ -176,7 +176,6 @@ bool Tokenizador::Tokenizar (const string & i) const
 	}
 
 	getline(input, contents);
-	cout << "contents: " <<  contents << endl;
 
 	list<string> tokens;
 	this->Tokenizar(contents, tokens);
@@ -224,6 +223,7 @@ bool Tokenizador::TokenizarDirectorio (const string& i) const
 	DIR *dirp;
 	struct dirent *dent;
 	struct stat fileInfo;
+	ifstream inputFile;
 
 	string my_path = "";
 
@@ -243,9 +243,6 @@ bool Tokenizador::TokenizarDirectorio (const string& i) const
 		// iterate each file/folder inside
 		for( ; (dent = readdir(dirp)) ; ) {
 
-				// this is -1 when the file doesn't exist or otherwise fails
-				// shouldn't be needed but if something fails try this
-
 			string filename = my_path + dent->d_name;
 			
 			if( (string)dent->d_name=="." or (string)dent->d_name==".." ) 
@@ -260,13 +257,14 @@ bool Tokenizador::TokenizarDirectorio (const string& i) const
 				
 				// we assume it's a file then
 				else {
-					// here is where you would read it TODO
+					if(!this->Tokenizar(filename))
+						return false;
 				}
 			}
 		}
-		closedir(dirp);
+		//closedir(dirp);
 	}
-	return false;
+	return true;
 }
 
 // S
