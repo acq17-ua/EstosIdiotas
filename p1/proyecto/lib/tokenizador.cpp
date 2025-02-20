@@ -1,8 +1,12 @@
 #include "tokenizador.h"
 #include <iostream>
-#include <cstdlib>
-#include <string.h>
-#include <fstream>
+// #include <cstdlib> 		// for list
+
+#include <fstream> 
+#include <sys/stat.h> 		// to check smthng is dir or not
+#include <dirent.h> 		// to read dir
+#include <bits/stdc++.h> 	// for vector
+#include <queue> 			// to read folders recursively
 
 /////////
 // AUX //
@@ -11,6 +15,58 @@
 string quitarRepetidos(string str)
 {
 	return "";
+}
+
+bool leerArbolCarpetas(string root, vector<string>& files )
+{
+	queue<string> folders;
+	DIR *dirp;
+	struct dirent *dent;
+	struct stat fileInfo;
+
+	string my_path = "";
+
+	// root folder
+	folders.push(root);
+
+	// read folders as they are added
+	while(!folders.empty()) {
+
+		dirp = opendir(folders.front().c_str());
+
+		// "files/"
+		my_path = folders.front() + "/";
+
+		folders.pop();
+		
+		// iterate each file/folder inside
+		for( ; (dent = readdir(dirp)) ; ) {
+
+				// this is -1 when the file doesn't exist or otherwise fails
+				// shouldn't be needed but if something fails try this
+
+			string filename = my_path + dent->d_name;
+
+			if( filename == my_path+"." or filename == my_path+".." ) 
+				continue;
+
+			// if correct reading
+			if(lstat(filename.c_str(), &fileInfo) == 0) {
+
+				// is a folder
+				if( S_ISDIR(fileInfo.st_mode)) 
+					folders.push(filename);  	
+				
+				// we assume it's a file then
+				else {
+					files.push_back(filename); 
+					// here is where you would read it TODO
+				}
+			}
+		}
+		closedir(dirp);
+	}
+	return true;
 }
 
 ///////////
@@ -142,11 +198,74 @@ bool Tokenizador::Tokenizar (const string & i) const
 // LA IMPORTANTE
 bool Tokenizador::TokenizarListaFicheros (const string& i) const 
 {
-	return false;
+	ifstream inputFiles;
+	vector<string> fileList;
+	string file;
+
+	inputFiles.open(i);
+	if( !inputFiles ) {
+		cerr << "El archivo " << i << " no existe o no es accesible\n";
+		return false;
+	}
+
+	while(getline(inputFiles, file))
+		fileList.push_back(file);
+
+	for(int i=0; i<fileList.size(); i++)
+		this->Tokenizar(fileList[i], fileList[i]+".tk");
+
+	return true;
 } 
 
+// esto funciona pero jo-der debe ser super lento
 bool Tokenizador::TokenizarDirectorio (const string& i) const
 {
+	queue<string> folders; // esto podría cambiarlo por un array que redimensiono de 15 en 15 cuando veo que hace falta
+	DIR *dirp;
+	struct dirent *dent;
+	struct stat fileInfo;
+
+	string my_path = "";
+
+	// root folder
+	folders.push(i);
+
+	// read folders as they are added
+	while(!folders.empty()) {
+
+		dirp = opendir(folders.front().c_str());
+
+		// "files/"
+		my_path = folders.front() + "/";
+
+		folders.pop();
+		
+		// iterate each file/folder inside
+		for( ; (dent = readdir(dirp)) ; ) {
+
+				// this is -1 when the file doesn't exist or otherwise fails
+				// shouldn't be needed but if something fails try this
+
+			string filename = my_path + dent->d_name;
+			
+			if( (string)dent->d_name=="." or (string)dent->d_name==".." ) 
+				continue;
+
+			// if correct reading
+			if(lstat(filename.c_str(), &fileInfo) == 0) {
+
+				// is a folder
+				if( S_ISDIR(fileInfo.st_mode)) 
+					folders.push(filename);  	
+				
+				// we assume it's a file then
+				else {
+					// here is where you would read it TODO
+				}
+			}
+		}
+		closedir(dirp);
+	}
 	return false;
 }
 
