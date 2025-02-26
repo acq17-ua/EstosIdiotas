@@ -3,7 +3,6 @@
 
 #include <fstream> 
 #include <sys/stat.h> 		// to check smthng is dir or not
-#include <bits/stdc++.h> 	// for vector
 #include <sys/mman.h>
 #include <fcntl.h>
 /////////
@@ -194,8 +193,7 @@ bool Tokenizador::Tokenizar (const string & i) const
 // LA IMPORTANTE
 bool Tokenizador::TokenizarListaFicheros (const string& input) const 
 {
-	vector<string> fileList;
-	string file = "";
+	string file;
 	struct stat fileInfo, child_fileInfo;
 	int fd;
 	char *map;
@@ -233,13 +231,11 @@ bool Tokenizador::TokenizarListaFicheros (const string& input) const
 				}
 				else 
 					return false;
-				continue;
 			}
 		}	
 		return true;
 	}
-	else
-		return false;
+	return false;
 } 
 
 bool Tokenizador::TokenizarDirectorio (const string& i) const
