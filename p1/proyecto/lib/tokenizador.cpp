@@ -1,13 +1,11 @@
 #include "tokenizador.h"
 #include <iostream>
-// #include <cstdlib> 		// for list
 
 #include <fstream> 
 #include <sys/stat.h> 		// to check smthng is dir or not
-#include <dirent.h> 		// to read dir
 #include <bits/stdc++.h> 	// for vector
-#include <queue> 			// to read folders recursively
-
+#include <sys/mman.h>
+#include <fcntl.h>
 /////////
 // AUX //
 /////////
@@ -15,58 +13,6 @@
 string quitarRepetidos(string str)
 {
 	return "";
-}
-
-bool leerArbolCarpetas(string root, vector<string>& files )
-{
-	queue<string> folders;
-	DIR *dirp;
-	struct dirent *dent;
-	struct stat fileInfo;
-
-	string my_path = "";
-
-	// root folder
-	folders.push(root);
-
-	// read folders as they are added
-	while(!folders.empty()) {
-
-		dirp = opendir(folders.front().c_str());
-
-		// "files/"
-		my_path = folders.front() + "/";
-
-		folders.pop();
-		
-		// iterate each file/folder inside
-		for( ; (dent = readdir(dirp)) ; ) {
-
-				// this is -1 when the file doesn't exist or otherwise fails
-				// shouldn't be needed but if something fails try this
-
-			string filename = my_path + dent->d_name;
-
-			if( filename == my_path+"." or filename == my_path+".." ) 
-				continue;
-
-			// if correct reading
-			if(lstat(filename.c_str(), &fileInfo) == 0) {
-
-				// is a folder
-				if( S_ISDIR(fileInfo.st_mode)) 
-					folders.push(filename);  	
-				
-				// we assume it's a file then
-				else {
-					files.push_back(filename); 
-					// here is where you would read it TODO
-				}
-			}
-		}
-		closedir(dirp);
-	}
-	return true;
 }
 
 ///////////
@@ -116,16 +62,67 @@ Tokenizador& Tokenizador::operator= (const Tokenizador& t)
 	return *this;
 }
 
+bool http_checker(string& str, int start, int end) {
+
+	if( (end-start) >= 4 ) {
+		if (str[start]=='f' && str[start+1]=='t' && str[start+2]=='p' && str[start+3]==':')
+			return true;
+
+		if (str[start]=='h' && str[start+1]=='t' && str[start+2]=='t' && str[start+3]=='p') 
+			return ((str.length()==5 && str[start+4]==':' ) || (str[start+4]=='s' && str[start+5]==':'));
+	}
+	return false;
+}
+
 void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
 {
-	string::size_type lastPos = str.find_first_not_of(this->delimiters, 0);
-	string::size_type pos = str.find_first_of(this->delimiters, lastPos);
+	tokens.clear();
 
-	while( string::npos != pos && string::npos != lastPos ) {
+	if( this->casosEspeciales ) {
+		string::size_type lastPos = str.find_first_not_of(this->delimiters, 0);
+		string::size_type pos = str.find_first_of(this->delimiters, lastPos);
 
-		tokens.push_back(str.substr(lastPos, pos-lastPos));
-		lastPos = str.find_first_not_of(delimiters, pos);
-		pos = str.find_first_of(delimiters, lastPos);
+		while( string::npos != pos && string::npos != lastPos ) {
+
+			tokens.push_back(str.substr(lastPos, pos-lastPos));
+			lastPos = str.find_first_not_of(delimiters, pos);
+			pos = str.find_first_of(delimiters, lastPos);
+		}
+	}
+	else {   // control de casos especiales
+
+		int length = str.length();
+		string token = "",
+			   aux = "";
+		int token_start = 0, 
+			token_end = 0;
+		
+		bool been_letter = false,
+			 canbe_url = true;
+
+
+		for( int i=0; i<length; i++ ) {
+
+			// url, email, acronimo, token
+			if( isalpha(str[i]) ) {
+
+				been_letter = true;
+
+			}
+			// url o delim
+			if( str[i] == ':' ) {
+
+				if(canbe_url) {
+					//canbe_url = http_checker(str, token_start, i);
+					
+
+				}
+
+			}
+
+
+		}
+
 	}
 }
 
@@ -195,76 +192,60 @@ bool Tokenizador::Tokenizar (const string & i) const
 }
 
 // LA IMPORTANTE
-bool Tokenizador::TokenizarListaFicheros (const string& i) const 
+bool Tokenizador::TokenizarListaFicheros (const string& input) const 
 {
-	ifstream inputFiles;
 	vector<string> fileList;
-	string file;
+	string file = "";
+	struct stat fileInfo, child_fileInfo;
+	int fd;
+	char *map;
+	int prev_it = 0;
 
-	inputFiles.open(i);
-	if( !inputFiles ) {
-		cerr << "El archivo " << i << " no existe o no es accesible\n";
-		return false;
+	fd = open(input.c_str(), O_RDONLY);
+	
+	if( lstat(input.c_str(), &fileInfo) == 0 ) {
+		
+		if(fd == -1) {
+			cerr << "Failed to read file\n";
+			return false;
+		}
+		map = (char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
+		
+		if( map == 	MAP_FAILED ) {
+			cerr << "Failed to read file\n";
+			return false;
+		}
+
+		// we're in the clear
+		for (int it = 0; it <=fileInfo.st_size; ++it) {
+
+			if( map[it] == '\n' ) {
+				
+				file = string(map+prev_it, map+it);
+				prev_it = it+1;
+
+				if( lstat(file.c_str(), &child_fileInfo) == 0 ) {
+
+					if( S_ISDIR(child_fileInfo.st_mode) ) 
+						this->TokenizarDirectorio(file);
+					else 
+						this->Tokenizar(file, file+".tk");
+				}
+				else 
+					return false;
+				continue;
+			}
+		}	
+		return true;
 	}
-
-	while(getline(inputFiles, file))
-		fileList.push_back(file);
-
-	for(int i=0; i<fileList.size(); i++)
-		this->Tokenizar(fileList[i], fileList[i]+".tk");
-
-	return true;
+	else
+		return false;
 } 
 
-// esto funciona pero jo-der debe ser super lento
 bool Tokenizador::TokenizarDirectorio (const string& i) const
 {
-	queue<string> folders; // esto podría cambiarlo por un array que redimensiono de 15 en 15 cuando veo que hace falta
-	DIR *dirp;
-	struct dirent *dent;
-	struct stat fileInfo;
-	ifstream inputFile;
-
-	string my_path = "";
-
-	// root folder
-	folders.push(i);
-
-	// read folders as they are added
-	while(!folders.empty()) {
-
-		dirp = opendir(folders.front().c_str());
-
-		// "files/"
-		my_path = folders.front() + "/";
-
-		folders.pop();
-		
-		// iterate each file/folder inside
-		for( ; (dent = readdir(dirp)) ; ) {
-
-			string filename = my_path + dent->d_name;
-			
-			if( (string)dent->d_name=="." or (string)dent->d_name==".." ) 
-				continue;
-
-			// if correct reading
-			if(lstat(filename.c_str(), &fileInfo) == 0) {
-
-				// is a folder
-				if( S_ISDIR(fileInfo.st_mode)) 
-					folders.push(filename);  	
-				
-				// we assume it's a file then
-				else {
-					if(!this->Tokenizar(filename))
-						return false;
-				}
-			}
-		}
-		//closedir(dirp);
-	}
-	return true;
+	system(("find " + i + " ! -type d ! -name '*.tk' > ./tokenizar_directorio_res.txt").c_str());
+	return TokenizarListaFicheros("tokenizar_directorio_res.txt");
 }
 
 // S
