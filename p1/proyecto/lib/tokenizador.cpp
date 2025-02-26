@@ -86,6 +86,7 @@ bool http_checker(string& str, int start, int end) {
 	return false;
 }
 
+// TODO
 void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
 {
 	tokens.clear();
@@ -134,37 +135,75 @@ void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
 	}
 }
 
-bool Tokenizador::Tokenizar (const string& i, const string& f) const
+bool Tokenizador::Tokenizar (const string& input, const string& output) const
 {
-	ifstream input;
-	ofstream output;
-	string contents;
-
-	input.open(i);
-	
-	if( !input ) {
-		cerr << "El archivo " << i << " no existe o no es accesible\n";
-		return false;
-	}
-
-	getline(input, contents);
-
-
+	struct stat fileInfo;
+	char* map;
+	int fd, i=0;
 	list<string> tokens;
-	this->Tokenizar(contents, tokens);
-	
-	output.open(f);
+	size_t fileSize;
 
-	if( !output ) {
-		cerr << "El archivo " << i << " no existe o no es accesible\n";
-		return false;
+	//////////
+	// READ //
+
+	fd = open(input.c_str(), O_RDONLY);
+
+	if( lstat(input.c_str(), &fileInfo) == 0 ) {
+		
+		if(fd == -1) {
+			cerr << "Failed to read file\n";
+			return false;
+		}
+		
+		fileSize = fileInfo.st_size;
+		map = (char*)mmap(0, fileSize, PROT_READ, MAP_SHARED, fd, 0);
+		
+		if( map == 	MAP_FAILED ) {
+			cerr << "Failed to read file\n";
+			return false;
+		}
+		// get just one line
+		for( i=0; i<fileInfo.st_size && map[i]!='\n'; i++); 
+		
+		fileSize = i * sizeof(char); // cuz it only reads one line but there may be more
+
+		this->Tokenizar(string(map, map+i), tokens);
 	}
-	
-	list<string>::const_iterator it;
-	for (it=tokens.begin(); it!=tokens.end(); ++it)
-		output << it->c_str() << endl;
+	else return false;
 
-	return true;
+	///////////
+	// WRITE //
+
+	fd = open(output.c_str(), O_RDWR | O_CREAT | O_TRUNC, (mode_t)0600);
+
+	// set file size (will fail catastrophically if you remove this)
+	ftruncate(fd, fileSize);
+
+	if( lstat(output.c_str(), &fileInfo) == 0 ) {
+		
+		if(fd == -1) {
+			cerr << "Failed to write into .tk file\n";
+			return false;
+		}
+		map = (char*)mmap(0, fileSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+		
+		if( map == 	MAP_FAILED ) {
+			cerr << "Failed to write into .tk file\n";
+			return false;
+		}
+
+		// copy tokens list into file
+		for( auto const& it : tokens ) {
+
+			for( i=0; i<it.size(); i++ )
+				map[i] = it[i];
+
+			map[i] = '\n';
+
+		}
+		return true;
+	}
+	else return false;
 }
 
 bool Tokenizador::Tokenizar (const string & input) const 
