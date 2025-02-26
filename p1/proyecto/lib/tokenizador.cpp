@@ -1,17 +1,29 @@
 #include "tokenizador.h"
 #include <iostream>
 
-#include <fstream> 
-#include <sys/stat.h> 		// to check smthng is dir or not
-#include <sys/mman.h>
-#include <fcntl.h>
+#include <fstream> 	// este compa ya está muerto
+#include <sys/stat.h> 		// para metadatos de archivos
+#include <sys/mman.h> 		// para memory mapping
+#include <fcntl.h> 			// para acceso a archivos
+#include <unordered_map>  	// para quitar repetidos de string
+
+
 /////////
 // AUX //
 /////////
-
-string quitarRepetidos(string str)
+string quitar_repetidos(string s)
 {
-	return "";
+    unordered_map<char, int> exists;
+	int n = s.size();
+ 
+    string ans = "";
+    for (int i = 0; i < n; i++) {
+        if (exists.find(s[i]) == exists.end()) {
+            ans.push_back(s[i]);
+            exists[s[i]]++;
+        }
+    }
+    return ans;
 }
 
 ///////////
@@ -35,7 +47,7 @@ Tokenizador::Tokenizador ()
 
 Tokenizador::Tokenizador(const string& delimitadoresPalabra, const bool& kcasosEspeciales, const bool& minuscSinAcentos)
 {
-	this->delimiters = quitarRepetidos(delimitadoresPalabra);
+	this->delimiters = quitar_repetidos(delimitadoresPalabra);
 	this->casosEspeciales = kcasosEspeciales;
 	this->pasarAminuscSinAcentos = minuscSinAcentos;
 }	
