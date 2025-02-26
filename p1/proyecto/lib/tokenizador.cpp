@@ -245,7 +245,9 @@ bool Tokenizador::TokenizarListaFicheros (const string& input) const
 bool Tokenizador::TokenizarDirectorio (const string& i) const
 {
 	system(("find " + i + " ! -type d ! -name '*.tk' > ./tokenizar_directorio_res.txt").c_str());
-	return TokenizarListaFicheros("tokenizar_directorio_res.txt");
+	bool result = TokenizarListaFicheros("tokenizar_directorio_res.txt");
+	system("rm ./tokenizar_directorio_res.txt");
+	return result;
 }
 
 // S
