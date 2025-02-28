@@ -11,7 +11,7 @@
 //////////
 
 bool delimiters[256] = {0};
-int conversion[256] = 	{
+const int conversion[256] = 	{
 						  0,   1,   2,   3,   4,   5,   6,   7,   8,   9, 
 						 10,  11,  12,  13,  14,  15,  16,  17,  18,  19, 
 						 20,  21,  22,  23,  24,  25,  26,  27,  28,  29, 
@@ -39,6 +39,7 @@ int conversion[256] = 	{
 						240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 
 						250, 251, 252, 253, 254, 255 
 						};
+
 
 /////////
 // AUX //
@@ -127,26 +128,118 @@ void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
 	}
 	else {   // control de casos especiales
 
-		//int length = str.length();
+		bool canBeUrl 		= true,
+			 canBeDecimal 	= true,
+			 canBeEmail 	= true,
+			 canBeAcronym 	= true,
+			 canBeMultiword = true;
 
-		// url
-		if( str.length() >= 4 || str.length() >= 6 ) {
+		int length = str.length();
+		int i = 0, 
+			token_start = 0;
+
+		while( i < length ) {
+
+			start_reading_token:
+
+			// quick checks
+			if( str[0] == ',' ) {
+				canBeAcronym = false;
+				canBeUrl = false;
+				goto decimales;
+			}
+			else if( str[0] == '.' || (str[0] >= 48 str[0] <= 57 )  ) { // . or is number
+				canBeUrl = false;
+				goto decimales;
+			}
+
+			/****************/
+			/***** URL ******/
+			/****************/
+
+			// start checker
+			if( length >= 5 ) {
+					
+				i = 3 * ( 	conversion[str[0]] == 'h' &&
+							conversion[str[1]] == 't' &&
+							conversion[str[2]] == 't' &&
+							conversion[str[3]] == 'p');
+
+				if( i ) {
+					// situate i at end of http:
+					i += 2 * ( i==3 && conversion[str[4]]==':' );
+
+					// situate i at the end of https:
+					i += 3 * ( length >= 6 && conversion[str[4]]=='s' && conversion[str[5]]==':'); 
+				}
+			}
+
+			if( !i && length >= 4 ) {   // then its not http: or https:
+
+				canBeUrl = ( 	conversion[str[0]] == 'f' &&
+								conversion[str[1]] == 't' &&
+								conversion[str[2]] == 'p' &&
+								conversion[str[3]] == ':');
+				i = canBeUrl*5;
+
+			}
+			else
+				canBeUrl = false;
+
+			// get the rest
+			if( canBeUrl ) {
+				
+				for( i ; i<length; i++ ) {
+					if( delimiters[str[i]] /*y no es uno de los caracteres reservados*/ ) {
+						tokens.push_back(string(token_start, i-1));
+						token_start = i+1;
+						goto start_reading_token;
+					}
+				}
+			}
+
+			/****************/
+			/** decimales ***/
+			/****************/
+			decimales:
 			
-			if( str[0] == 'h' ) {
-			
+			bool add_zero = false, just_dot = false;
+
+			if( str[i] == '.' ) {
+				i++;
+				add_zero = true;
+			}
+			if( str[i] == ',' ) {
+				i++;
+				add_zero true;
+				canBeAcronym = false;
+			}
+			for( i ; i<length; i++ ) {
+				
+				if( just_dot && (str[i]=='.') ) {   // no longer a decimal or an acronym
+
+					canBeDecimal = canBeAcronym = false;
+
+					// skip dots if they're delimiters? i dont fucking know dude
+
+				}
+				just_dot = (str[i]=='.');
+				canBeAcronym *= !(str[i]==',');
 				
 
-			}
-			else if( str[0] == 'f' ) {
 
+				if( delimiters[str[i]] ) {
+					if( add_zero )
+						tokens.push_back("0" + string(token_start, i-1));
+					else
+						tokens.push_back(string(token_start, i-1));
+					token_start = i+1;
+					goto start_reading_token;
+				}
 			}
-			else {
-				// not url
-			}
+
 
 		}
-
-
 	}
 }
 
