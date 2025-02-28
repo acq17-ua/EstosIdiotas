@@ -1,29 +1,60 @@
 #include "tokenizador.h"
 #include <iostream>
 
-#include <fstream> 	// este compa ya está muerto
 #include <sys/stat.h> 		// para metadatos de archivos
 #include <sys/mman.h> 		// para memory mapping
 #include <fcntl.h> 			// para acceso a archivos
-#include <unordered_map>  	// para quitar repetidos de string
 #include <unistd.h>
 
+//////////
+// save //
+//////////
+
+bool delimiters[256] = {0};
+int conversion[256] = 	{
+						  0,   1,   2,   3,   4,   5,   6,   7,   8,   9, 
+						 10,  11,  12,  13,  14,  15,  16,  17,  18,  19, 
+						 20,  21,  22,  23,  24,  25,  26,  27,  28,  29, 
+						 30,  31,  32,  33,  34,  35,  36,  37,  38,  39, 
+						 40,  41,  42,  43,  44,  45,  46,  47,  48,  49, 
+						 50,  51,  52,  53,  54,  55,  56,  57,  58,  59, 
+						 60,  61,  62,  63,  64,  97,  98,  99, 100, 101,   // letras mayusculas
+						102, 103, 104, 105, 106, 107, 108, 109, 110, 111,   //
+						112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 	//
+						122,  91,  92,  93,  94,  95,  96,  97,  98,  99,   // letras minusculas
+						100, 101, 102, 103, 104, 105, 106, 107, 108, 109,   //
+						110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 	//
+						120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 	//
+						130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 
+						140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 
+						150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 
+						160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 
+						170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 
+						180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 
+						190, 191, 192,  97, 194, 195, 196, 197, 198, 199, 	// acentos 
+						200, 101, 202, 203, 204, 105, 206, 207, 208, 209,   //
+						210, 111, 212, 213, 214, 215, 216, 217, 117, 219, 
+						220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 
+						230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 
+						240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 
+						250, 251, 252, 253, 254, 255 
+						};
 
 /////////
 // AUX //
 /////////
-string quitar_repetidos(string s)
+string procesar_delimitadores(string s)
 {
-    unordered_map<char, int> exists;
 	int n = s.size();
- 
     string ans = "";
-    for (int i = 0; i < n; i++) {
-        if (exists.find(s[i]) == exists.end()) {
-            ans.push_back(s[i]);
-            exists[s[i]]++;
-        }
-    }
+ 
+	for (int i = 0; i < n; i++) {
+		
+		if( !delimiters[s[i]] ) {
+			delimiters[s[i]] = true;
+			ans += s[i];
+		}
+	}
     return ans;
 }
 
@@ -42,13 +73,17 @@ ostream& operator<<(ostream& os, const Tokenizador& t)
 Tokenizador::Tokenizador ()
 {
 	this->delimiters = ",;:.-/+*\\ '\"{}[]()<>¡!¿?&#=\t@";
+
+	for( auto c : this->delimiters )
+		delimiters[c] = true;
+
 	this->casosEspeciales = true;
 	this->pasarAminuscSinAcentos = false;
 }	
 
 Tokenizador::Tokenizador(const string& delimitadoresPalabra, const bool& kcasosEspeciales, const bool& minuscSinAcentos)
 {
-	this->delimiters = quitar_repetidos(delimitadoresPalabra);
+	this->delimiters = procesar_delimitadores(delimitadoresPalabra);
 	this->casosEspeciales = kcasosEspeciales;
 	this->pasarAminuscSinAcentos = minuscSinAcentos;
 }	
@@ -74,24 +109,12 @@ Tokenizador& Tokenizador::operator= (const Tokenizador& t)
 	return *this;
 }
 
-bool http_checker(string& str, int start, int end) {
-
-	if( (end-start) >= 4 ) {
-		if (str[start]=='f' && str[start+1]=='t' && str[start+2]=='p' && str[start+3]==':')
-			return true;
-
-		if (str[start]=='h' && str[start+1]=='t' && str[start+2]=='t' && str[start+3]=='p') 
-			return ((str.length()==5 && str[start+4]==':' ) || (str[start+4]=='s' && str[start+5]==':'));
-	}
-	return false;
-}
-
 // TODO
 void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
 {
 	tokens.clear();
 
-	if( this->casosEspeciales ) {
+	if( !this->casosEspeciales ) {
 		string::size_type lastPos = str.find_first_not_of(this->delimiters, 0);
 		string::size_type pos = str.find_first_of(this->delimiters, lastPos);
 
@@ -104,34 +127,26 @@ void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
 	}
 	else {   // control de casos especiales
 
-		int length = str.length();
-		string token = "",
-			   aux = "";
-		int token_start = 0, 
-			token_end = 0;
-		
-		bool been_letter = false,
-			 canbe_url = true;
+		//int length = str.length();
 
-
-		for( int i=0; i<length; i++ ) {
-
-			// url, email, acronimo, token
-			if( isalpha(str[i]) ) {
-
-				been_letter = true;
+		// url
+		if( str.length() >= 4 || str.length() >= 6 ) {
+			
+			if( str[0] == 'h' ) {
+			
+				
 
 			}
-			// url o delim
-			if( str[i] == ':' ) {
+			else if( str[0] == 'f' ) {
 
-				if(canbe_url) {
-					//canbe_url = http_checker(str, token_start, i);
-					
-
-				}
 			}
+			else {
+				// not url
+			}
+
 		}
+
+
 	}
 }
 
