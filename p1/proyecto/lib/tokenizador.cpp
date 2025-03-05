@@ -4,14 +4,14 @@
 #include <sys/stat.h> 		// para metadatos de archivos
 #include <sys/mman.h> 		// para memory mapping
 #include <fcntl.h> 			// para acceso a archivos
-#include <unistd.h>
+#include <unistd.h> 		// set size of output files
 
 //////////
 // save //
 //////////
 
 bool delimiters[256] = {0};
-const int conversion[256] = 	{
+constexpr int conversion[256] = 	{
 						  0,   1,   2,   3,   4,   5,   6,   7,   8,   9, 
 						 10,  11,  12,  13,  14,  15,  16,  17,  18,  19, 
 						 20,  21,  22,  23,  24,  25,  26,  27,  28,  29, 
@@ -40,6 +40,31 @@ const int conversion[256] = 	{
 						250, 251, 252, 253, 254, 255 
 						};
 
+// URL    ->    _:/.?&-=#@
+// decim  -> 	.,
+// email  ->   	.-_@
+// acron  -> 	.
+// multiw -> 	-
+
+// estados necesarios para expresar que caracteres son excepciones para cada caso especial
+// 0: no es excepción
+// 1: exc para solo decimal
+// 2: exc para solo URL
+// 3: exc para solo URL e email
+// 4: exc para solo URL, email y multipalabra
+// 5: exc para solo URL, decimal, email, acronimo y multipalabra
+constexpr char exceptions[95] = 	{
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
+						  0,   0,   0,   0,   0,   2,   0,   0,   2,   0, 
+						  0,   0,   0,   0,   1,   4,   5,   2,   0,   0, 
+						  0,   0,   0,   0,   0,   0,   0,   0,   2,   0, 
+						  0,   2,   0,   2,   3,   0,   0,   0,   0,   0, 
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+						  0,   0,   0,   0,   0,   3 
+						  };
 
 /////////
 // AUX //
@@ -110,54 +135,54 @@ Tokenizador& Tokenizador::operator= (const Tokenizador& t)
 	return *this;
 }
 
-// TODO
-void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
+void TokenizarCasosEspeciales( const string& str, list<string>& tokens ) const
 {
-	tokens.clear();
+	bool canBeUrl 		= true,
+		 canBeDecimal 	= true,
+			headingZero = false,
+		 canBeEmail 	= true,
+		 canBeAcronym 	= true,
+		 canBeMultiword = true;
 
-	if( !this->casosEspeciales ) {
-		string::size_type lastPos = str.find_first_not_of(this->delimiters, 0);
-		string::size_type pos = str.find_first_of(this->delimiters, lastPos);
+	int length = str.length();
+	int i = 0, 
+		token_start = 0;
 
-		while( string::npos != pos && string::npos != lastPos ) {
+	while( i < length ) {
 
-			tokens.push_back(str.substr(lastPos, pos-lastPos));
-			lastPos = str.find_first_not_of(delimiters, pos);
-			pos = str.find_first_of(delimiters, lastPos);
+		start_reading_token:
+
+		// bypass
+		if( str[i] == ',' ) {
+			canBeAcronym = canBeUrl = false;
+			headingZero = true;
+			goto decimales;
 		}
-	}
-	else {   // control de casos especiales
+		else if( str[i] == '.' ) {
 
-		bool canBeUrl 		= true,
-			 canBeDecimal 	= true,
-			 canBeEmail 	= true,
-			 canBeAcronym 	= true,
-			 canBeMultiword = true;
+			canBeUrl = false;
+			headingZero = true;
+			canBeEmail = !delimiters[str[i]];
+			goto decimales;
+		} 
 
-		int length = str.length();
-		int i = 0, 
-			token_start = 0;
+		else if (str[i] >= 48 && str[i] <= 57 ) { // number
+			canBeUrl = false;
+			goto decimales;
+		}
+		else if( (str[i] != 'h' && str[i] != 'f') ) {
+			canBeUrl = false;
+			canBeDecimal = false;
+		}
 
-		while( i < length ) {
+		/****************/
+		/***** URL ******/
+		/****************/
 
-			start_reading_token:
-
-			// quick checks
-			if( str[0] == ',' ) {
-				canBeAcronym = false;
-				canBeUrl = false;
-				goto decimales;
-			}
-			else if( str[0] == '.' || (str[0] >= 48 str[0] <= 57 )  ) { // . or is number
-				canBeUrl = false;
-				goto decimales;
-			}
-
-			/****************/
-			/***** URL ******/
-			/****************/
-
-			// start checker
+		urls:
+		
+		// start checker
+		if( canBeUrl ) {
 			if( length >= 5 ) {
 					
 				i = 3 * ( 	conversion[str[0]] == 'h' &&
@@ -197,31 +222,26 @@ void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
 					}
 				}
 			}
+		}
+		/****************/
+		/** decimales ***/
+		/****************/
+		decimales:
+		if( canBeDecimal ) {
 
-			/****************/
-			/** decimales ***/
-			/****************/
-			decimales:
-			
-			bool add_zero = false, just_dot = false;
-
-			if( str[i] == '.' ) {
-				i++;
-				add_zero = true;
-			}
-			if( str[i] == ',' ) {
-				i++;
-				add_zero true;
-				canBeAcronym = false;
-			}
+			bool just_dot = false;
+			// iterate decimal number
 			for( i ; i<length; i++ ) {
 				
 				if( just_dot && (str[i]=='.') ) {   // no longer a decimal or an acronym
 
 					canBeDecimal = canBeAcronym = false;
-
-					// skip dots if they're delimiters? i dont fucking know dude
-
+					
+					if( delimiters[str[i]] ) {
+						// then the token is normal and over
+						i++;
+						goto start_reading_token;
+					}
 				}
 				just_dot = (str[i]=='.');
 				canBeAcronym *= !(str[i]==',');
@@ -229,18 +249,35 @@ void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
 
 
 				if( delimiters[str[i]] ) {
-					if( add_zero )
-						tokens.push_back("0" + string(token_start, i-1));
+					if( headingZero )
+						tokens.push_back("0" + string(str, token_start, i-1));
 					else
-						tokens.push_back(string(token_start, i-1));
+						tokens.push_back(string(str, token_start, i-1));
 					token_start = i+1;
 					goto start_reading_token;
 				}
 			}
-
-
 		}
 	}
+}
+
+void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
+{
+	tokens.clear();
+
+	if( !this->casosEspeciales ) {
+		string::size_type lastPos = str.find_first_not_of(this->delimiters, 0);
+		string::size_type pos = str.find_first_of(this->delimiters, lastPos);
+
+		while( string::npos != pos && string::npos != lastPos ) {
+
+			tokens.push_back(str.substr(lastPos, pos-lastPos));
+			lastPos = str.find_first_not_of(delimiters, pos);
+			pos = str.find_first_of(delimiters, lastPos);
+		}
+	}
+	else
+		TokenizarCasosEspeciales(str, tokens);
 }
 
 bool Tokenizador::Tokenizar (const string& input, const string& output) const
