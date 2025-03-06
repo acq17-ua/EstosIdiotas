@@ -106,7 +106,6 @@ string procesar_delimitadores(string s)
 		}
 	}
 	delimiters[32] = true; // space
-
     return ans;
 }
 
@@ -163,13 +162,13 @@ Tokenizador& Tokenizador::operator= (const Tokenizador& t)
 
 void print_list(list<string>& cadena) {
 
-	cout << "tokens for now:\n";
+	cout << "tokens for now: [";
 	list<string>::const_iterator itCadena;
         for(itCadena=cadena.begin();itCadena!=cadena.end();itCadena++)
         {
-                cout << "[" << (*itCadena) << "]\n";
+                cout << (*itCadena) << ", ";
         }
-        cout << endl;
+        cout << "]" << endl;
 
 }
 
@@ -263,7 +262,7 @@ void TokenizarCasosEspeciales( const string& str, list<string>& tokens )
 				cout << "enter decimal" << endl;	
 				// remove heading .,
 				while( i<str.size() ) {
-					cout << "decimal i: " << i << endl;
+					//cout << "decimal i: " << i << endl;
 					switch( str[i] ) {
 
 						case '.': 
@@ -284,10 +283,10 @@ void TokenizarCasosEspeciales( const string& str, list<string>& tokens )
 				decimal_correct:
 				// ...except for one
 				if( token_start!=i ) {
-					cout << curr_token << "-> dassit" << endl;
+					//cout << curr_token << "-> dassit" << endl;
 					curr_token += '0' + str[i-1];
 					canBeEmail = after_at; 
-					cout << "dec crr_token: " << curr_token << endl;
+					//cout << "dec crr_token: " << curr_token << endl;
 				}
 
 				// read rest of number
@@ -318,7 +317,7 @@ void TokenizarCasosEspeciales( const string& str, list<string>& tokens )
 								//curr_token += conversion[str[i]];
 								// let email take care of this one
 								estado = EAM;
-								cout << "no, jumpin here" << endl;
+								//cout << "no, jumpin here" << endl;
 								goto read_email;
 							}
 
@@ -344,7 +343,7 @@ void TokenizarCasosEspeciales( const string& str, list<string>& tokens )
 								//curr_token += conversion[str[i]];
 								// let email take care of this one
 								estado = EAM;
-								cout << "jumpin here" << endl;
+								//cout << "jumpin here" << endl;
 								goto read_email;
 							}
 					}
@@ -362,7 +361,7 @@ void TokenizarCasosEspeciales( const string& str, list<string>& tokens )
 					cout << i << " " << str.size() << endl;
 					for( ; i<str.size(); i++ ) {
 
-						cout << "at i " << i << endl;
+						//cout << "at i " << i << endl;
 						switch( str[i] ) {
 							case '.':  					// not an email
 								goto read_acronym;
@@ -400,7 +399,7 @@ void TokenizarCasosEspeciales( const string& str, list<string>& tokens )
 								
 								else {					// filler character
 									curr_token += conversion[str[i]];
-									cout << "curr token is " << curr_token << endl;
+									//cout << "curr token is " << curr_token << endl;
 								}
 						}							
 					}
@@ -474,7 +473,7 @@ void TokenizarCasosEspeciales( const string& str, list<string>& tokens )
 			// check acronym
 			case AM:
 				read_acronym:
-				cout << "enter acronym" << endl;	
+				printf("enter acronym (%d)\n", i);	
 
 				if( canBeAcronym ) {
 					for( ; i<str.size(); i++ ) {
@@ -505,6 +504,8 @@ void TokenizarCasosEspeciales( const string& str, list<string>& tokens )
 						}
 					}
 				} 
+				else
+					goto read_multiword;
 				break;
 
 			// check multiword
@@ -529,15 +530,33 @@ void TokenizarCasosEspeciales( const string& str, list<string>& tokens )
 								}
 								break;
 							default: 				// filler character
+								
+								if( delimiters[str[i]] ) {
+									tokens.push_back(curr_token);
+									goto end;
+								}
 								just_dot = false;
 								curr_token += conversion[str[i]];
 								break;
 						}
 
 					}
-
 				}
+				else
+					goto read_token;
 				break;
+
+			default:
+				read_token:
+				for( ; i<str.size(); i++ ) { 		// just read until delim or EOS
+					if( delimiters[str[i]] ) {
+						tokens.push_back(curr_token);
+						goto end;
+					}
+					curr_token += conversion[str[i]];
+				}
+				tokens.push_back(curr_token);
+					goto end;
 		}
 
 
