@@ -10,7 +10,16 @@
 // save //
 //////////
 
+enum casosEspeciales {
+						UDEAM,
+						DEAM,
+						EAM,
+						AM,
+						M
+};
+
 bool delimiters[256] = {0};
+
 constexpr int conversion[256] = 	{
 						  0,   1,   2,   3,   4,   5,   6,   7,   8,   9, 
 						 10,  11,  12,  13,  14,  15,  16,  17,  18,  19, 
@@ -53,7 +62,7 @@ constexpr int conversion[256] = 	{
 // 3: exc para solo URL e email
 // 4: exc para solo URL, email y multipalabra
 // 5: exc para solo URL, decimal, email, acronimo y multipalabra
-constexpr char exceptions[95] = 	{
+constexpr char exceptions[256] = 	{
 						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
 						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
 						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
@@ -63,7 +72,22 @@ constexpr char exceptions[95] = 	{
 						  0,   2,   0,   2,   3,   0,   0,   0,   0,   0, 
 						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
 						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-						  0,   0,   0,   0,   0,   3 
+						  0,   0,   0,   0,   0,   3,  	0, 	 0,   0,   0,
+						  0,   0,   2,   0,   2,   0,   0,   0,   0,   0,
+						  0,   0,   2,   0,   0,   2,   0,   0,   0,   0,
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+						  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+						  0,   0,   0,   0,   0,   0,   0
 						  };
 
 /////////
@@ -81,6 +105,8 @@ string procesar_delimitadores(string s)
 			ans += s[i];
 		}
 	}
+	delimiters[32] = true; // space
+
     return ans;
 }
 
@@ -123,7 +149,7 @@ Tokenizador::Tokenizador (const Tokenizador& t)
 
 Tokenizador::~Tokenizador () 
 {
-	delimiters[0] = '\0';
+	delimiters.clear();
 }
 
 Tokenizador& Tokenizador::operator= (const Tokenizador& t)
@@ -135,130 +161,369 @@ Tokenizador& Tokenizador::operator= (const Tokenizador& t)
 	return *this;
 }
 
-void TokenizarCasosEspeciales( const string& str, list<string>& tokens ) const
+void TokenizarCasosEspeciales( const string& str, list<string>& tokens )
 {
-	bool canBeUrl 		= true,
-		 canBeDecimal 	= true,
-			headingZero = false,
-		 canBeEmail 	= true,
-		 canBeAcronym 	= true,
-		 canBeMultiword = true;
+	// True start of index, to be able to come back in case
+	// we advance i under a pressumption that later becomes false
+	int token_start = 0;
+	
+	// army of flags
+	bool canBeUrl 				= true,
+		 		start_checked 	= false,
+		 canBeDecimal 			= false,
+				heading_zero 	= false,
+				just_dot 		= false,
+		 canBeEmail 			= true,
+		 		after_at 		= false,
+		 canBeAcronym 			= true,
+		 canBeMultiword 		= true;
 
-	int length = str.length();
-	int i = 0, 
-		token_start = 0;
+	string curr_token = "";
+	string aux;
 
-	while( i < length ) {
+	enum casosEspeciales estado;
 
-		start_reading_token:
+	// LOOPING THROUGH ENTIRE STRING
+	for( int i=0 ; i < str.size(); i++ ) {   	
 
-		// bypass
-		if( str[i] == ',' ) {
-			canBeAcronym = canBeUrl = false;
-			headingZero = true;
-			goto decimales;
+		read_start:
+
+		token_start = i;
+		estado = UDEAM;
+
+		/////////////
+		//// url ////
+		/////////////
+
+		// check http: ftp: https:
+		if( str.size() >= 5 ) { 
+						
+			i += 3 * ( 	str[0] == 'h' &
+						str[1] == 't' &
+						str[2] == 't' &
+						str[3] == 'p');
+
+			if( (i-token_start) ) {
+				// situate i at end of http:
+				i += 2 * ( i==3 & str[4]==':' );
+
+				// situate i at the end of https:
+				i += 3 * ( str.size() >= 6 & str[4]=='s' & str[5]==':'); 
+			}
 		}
-		else if( str[i] == '.' ) {
 
-			canBeUrl = false;
-			headingZero = true;
-			canBeEmail = !delimiters[str[i]];
-			goto decimales;
-		} 
+		if( !(i-token_start) & length >= 4 ) {   // then its not http: or https:
 
-		else if (str[i] >= 48 && str[i] <= 57 ) { // number
-			canBeUrl = false;
-			goto decimales;
+			canBeUrl = ( 	str[0] == 'f' &
+							str[1] == 't' &
+							str[2] == 'p' &
+							str[3] == ':');
+			i += canBeUrl*5;
+
 		}
-		else if( (str[i] != 'h' && str[i] != 'f') ) {
+		else
 			canBeUrl = false;
-			canBeDecimal = false;
+
+		curr_token = string(str, token_start, i);  
+		//i++;  thats accounted for in previous increments
+
+		/////////////
+		// decimal //
+		/////////////
+		if( !canBeUrl ) {
+			estado = DEAM;
+			//heading_zero = ( str[0] == ',' | str[0] == '.' );
+			//canBeDecimal = heading_zero | ( str[0] >= 48 & str[0] <= 57 );
+
 		}
 
-		/****************/
-		/***** URL ******/
-		/****************/
+		///////////
+		// email //
+		///////////
 
-		urls:
+		///////////
+		// acron //
+		///////////
+		canBeAcronym = delimiters['.']; // thats literally it
+
+		switch( estado ) {
+
+			// check url
+			case UDEAM:
+	
+				for( ; i<str.size(); i++ ) {
+			
+					switch( str[i] ) {
+
+						case '_':
+						case ':':
+						case '/':
+						case '.':
+						case '?':
+						case '&':
+						case '-':
+						case '=':
+						case '#':
+						case '@': 								// allowed character
+							curr_token += conversion[str[i]];
+							break;
+
+						default:
+							if( delimiters[str[i]] ) {   		// true delimiter, token over
+								
+								tokens.push_back(curr_token);
+								curr_token.clear();
+								goto end;
+							}
+							else  								// filler character
+								curr_token += conversion[str[i]];
+					}
+				}
 		
-		// start checker
-		if( canBeUrl ) {
-			if( length >= 5 ) {
-					
-				i = 3 * ( 	conversion[str[0]] == 'h' &&
-							conversion[str[1]] == 't' &&
-							conversion[str[2]] == 't' &&
-							conversion[str[3]] == 'p');
+				break;
 
-				if( i ) {
-					// situate i at end of http:
-					i += 2 * ( i==3 && conversion[str[4]]==':' );
-
-					// situate i at the end of https:
-					i += 3 * ( length >= 6 && conversion[str[4]]=='s' && conversion[str[5]]==':'); 
-				}
-			}
-
-			if( !i && length >= 4 ) {   // then its not http: or https:
-
-				canBeUrl = ( 	conversion[str[0]] == 'f' &&
-								conversion[str[1]] == 't' &&
-								conversion[str[2]] == 'p' &&
-								conversion[str[3]] == ':');
-				i = canBeUrl*5;
-
-			}
-			else
-				canBeUrl = false;
-
-			// get the rest
-			if( canBeUrl ) {
+			// check decimal
+			case DEAM:
 				
-				for( i ; i<length; i++ ) {
-					if( delimiters[str[i]] /*y no es uno de los caracteres reservados*/ ) {
-						tokens.push_back(string(token_start, i-1));
-						token_start = i+1;
-						goto start_reading_token;
+				// remove heading .,
+				while( i<str.size() ) {
+					if( (str[i]=='.' | str[i]==',') )  	
+						i++; 		
+					else 
+						break;      
+				}
+				// ...except for one
+				if( token_start!=i ) {
+					curr_token += "0" + str[i-1];
+					canBeEmail = after_at; 
+				}
+
+				// read rest of number
+				for( ; i<str.size(); i++ ) {
+
+					switch( str[i] ) {
+
+						case ',':
+							// TODO maybe something about acronyms
+						case '.':
+
+							if( !just_dot ) { 					// single dot, we continue
+
+								just_dot = true;
+								curr_token += str[i];
+							}
+
+							else if( delimiter[str[i]] ) { 		// repeated dots, token over (at i-1)
+								
+								tokens.push_back(string(curr_token, 0, curr_token.size()-2));
+								i--;
+								goto read_start; 				// (not end bc we dont want i incremented)
+
+							}
+							else {   							// repeated dots, not delimited but not decimal
+								//curr_token += conversion[str[i]];
+								// let email take care of this one
+								goto read_email;
+							}
+
+							break;
+
+						case '0':
+						case '1':
+						case '2':
+						case '3':
+						case '4':
+						case '5':
+						case '6':
+						case '7':
+						case '8':
+						case '9': 								// filler character
+							curr_token += str[i];
+							just_dot = false;
+							break;
+						case '@':
+							after_at = true;
+
+						default:
+							if( delimiters[str[i]] ) {  		// true delimiter
+
+								tokens.push_back(curr_token);
+								curr_token.clear();
+								goto end;
+
+							}
+							else { 								// not delimited but not decimal
+								//curr_token += conversion[str[i]];
+								// let email take care of this one
+								goto read_email;
+							}
 					}
+				}
+
+				break;
+
+			// check email
+			case EAM:
+				read_email:
+				if( canBeEmail ) { // TODO	
+
+					// loop before @
+					while( !after_at & (i<str.size()) ) {
+
+						switch( str[i] ) {
+
+							// TODO maybe check others if theyre delimiters
+							case '@':
+								goto after_at_loop;
+							default:
+								if( delimiter[str[i]] ) { 		// not an email
+	
+									// try sending it somewhere else first
+									tokens.push_back(curr_token);
+									curr_token.clear();
+									goto end;
+									
+
+								} 
+								else { 							// filler character
+
+									curr_token += conversion[str[i]];
+								}
+
+						}							
+
+					}
+					after_at_loop:
+
+
+				}
+				break;
+
+			// check acronym
+			case AM:
+				read_acronym:
+				if( canBeAcronym ) {} // TODO
+				break;
+
+			// check multiword
+			case M:
+				read_multiword:
+				break;
+		}
+
+		// LOOPING THROUGH THE REST OF THE TOKEN
+
+		if( canBeDecimal ) { 
+			
+			for( ; i<str.size(); i++ ) {
+
+				switch( str[i] ) {
+
+					case ',':
+						canBeAcronym = !delimiters[','];
+					case '.':
+						
+						if( !just_dot ) { 						// single dot, we continue
+							just_dot = true;
+							curr_token += conversion[str[i]];
+						}
+						else if( delimiters[str[i]] ) { 		// repeated dots, gets delimited
+
+							tokens.push_back(string(curr_token, 0, curr_token.size()-2));
+							curr_token.clear();
+						}
+						else { 									// repeated dots, doesnt get delimited
+							canBeDecimal = canBeAcronym = false;
+							just_dot = true;
+						}
+
+						break;
+
+					case '0':
+					case '1':
+					case '2':
+					case '3':
+					case '4':
+					case '5':
+					case '6':
+					case '7':
+					case '8':
+					case '9':   								// just a number
+						just_dot = false;
+						curr_token += str[i];
+						break;
+
+					default:
+						
+						if( delimiters[str[i]] ) { 				// delimited like god intended
+							
+							tokens.push_back(curr_token);
+							curr_token.clear();
+						}
+						else 									// random character
+							canBeDecimal = false;
+
+						break;
 				}
 			}
 		}
-		/****************/
-		/** decimales ***/
-		/****************/
-		decimales:
-		if( canBeDecimal ) {
 
-			bool just_dot = false;
-			// iterate decimal number
-			for( i ; i<length; i++ ) {
-				
-				if( just_dot && (str[i]=='.') ) {   // no longer a decimal or an acronym
+		if( canBeEmail ) {
 
-					canBeDecimal = canBeAcronym = false;
-					
-					if( delimiters[str[i]] ) {
-						// then the token is normal and over
-						i++;
-						goto start_reading_token;
+			if( delimiters[str[i]] ) {
+
+				if( exceptions[str[i]] >= 3 ) { 
+
+					if( after_at ) { 						// then we good
+						curr_token += conversion[str[i]];
+					}
+					else { 									// cant be an email anymore
+						canBeEmail = false;
+						curr_token += conversion[str[i]];
 					}
 				}
-				just_dot = (str[i]=='.');
-				canBeAcronym *= !(str[i]==',');
-				
-
-
-				if( delimiters[str[i]] ) {
-					if( headingZero )
-						tokens.push_back("0" + string(str, token_start, i-1));
-					else
-						tokens.push_back(string(str, token_start, i-1));
-					token_start = i+1;
-					goto start_reading_token;
+				else { 										// true delimiter
+					tokens.push_back(curr_token);
+					//token_start = ++i;
+					curr_token.clear();
 				}
 			}
+			else { 											// just a normal character
+				curr_token += conversion[str[i]];
+			}
 		}
+
+		if( canBeAcronym ) {
+
+			if( delimiters[str[i]] ) {
+
+				if( exceptions[str[i]]==5 ) { 
+
+					if( just_dot ) { // cant be an acronym anymore, delimited at prev dot
+
+						tokens.push_back(string(curr_token, 0, curr_token.size()-2));
+						//token_start = ++i;
+						curr_token.clear();
+					}
+					else {
+						just_dot = true;
+						curr_token += conversion[str[i]];
+					}
+				}
+				else { // true delimiter
+					tokens.push_back(string(curr_token, 0, curr_token.size()-2));
+					curr_token.clear();
+				}
+			}
+			else { // normal character
+				curr_token += conversion[str[i]];
+			}
+		}
+
+		
+		end:
 	}
+
 }
 
 void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
