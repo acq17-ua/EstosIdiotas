@@ -5,20 +5,46 @@
 #include <sys/mman.h> 		// para memory mapping
 #include <fcntl.h> 			// para acceso a archivos
 #include <unistd.h> 		// set size of output files
-
-//////////
-// save //
-//////////
+#include <cstring> 			// clear array with memset
+#include <string> 			// find_first_not_of
 
 enum casosEspeciales {
+						U,
 						UDEAM,
 						DEAM,
 						EAM,
+						EA,
 						AM,
-						M
+						AO, 		// puede ser acronimo pero no multipalabra
+						M,
+						X
 };
 
-bool delimiters[256] = {0};
+enum casosEspeciales trueEstado = UDEAM;
+
+// . , - @ son muy condicionantes
+// quiero ahorrarme ifs
+// Esto indica cuales son delimitadores
+enum delimitadoresEspeciales {
+								O,  		// U 	   	  	Y	
+								P,        	// UA 			Y
+								C, 			// U 			-
+								G, 			// UM			Y
+								A, 			// UE 			Y
+								PC, 		// UDA 			Y
+								PG, 		// UMA 			Y
+								PA, 		// UAE			Y
+								CG, 		// UM 			Y
+								CA, 		// UE			Y
+								GA, 		// UME 			Y
+								PCG, 		// UDAM 		Y
+								PCA, 		// UDAE 		Y
+								PGA, 		// UMAE			Y
+								CGA, 		// UME 			-
+								PCGA 		// UDEAM 		Y
+};
+
+bool delimitadores[256] = {0};
 
 constexpr int conversion[256] = 	{
 						  0,   1,   2,   3,   4,   5,   6,   7,   8,   9, 
@@ -93,20 +119,23 @@ constexpr char exceptions[256] = 	{
 /////////
 // AUX //
 /////////
-string procesar_delimitadores(string s)
+string Tokenizador::procesar_delimitadores(string s) const
 {
 	int n = s.size();
-    string ans = "";
+    string delims = "";
  
+	for( auto& c : this->delimiters )
+		delimitadores[c] = 0;
+
 	for (int i = 0; i < n; i++) {
 		
-		if( !delimiters[s[i]] ) {
-			delimiters[s[i]] = true;
-			ans += s[i];
+		if( !delimitadores[s[i]] ) {
+			delimitadores[s[i]] = true;
+			delims += s[i];
 		}
 	}
-	delimiters[32] = true; // space
-    return ans;
+	delimitadores[' '] = true; // space
+    return delims;
 }
 
 ///////////
@@ -126,7 +155,7 @@ Tokenizador::Tokenizador ()
 	this->delimiters = ",;:.-/+*\\ '\"{}[]()<>�!�?&#=\t@";
 
 	for( auto c : this->delimiters )
-		delimiters[c] = true;
+		delimitadores[c] = true;
 
 	this->casosEspeciales = true;
 	this->pasarAminuscSinAcentos = false;
@@ -148,7 +177,7 @@ Tokenizador::Tokenizador (const Tokenizador& t)
 
 Tokenizador::~Tokenizador () 
 {
-	delimiters.clear();
+	this->delimiters.clear();
 }
 
 Tokenizador& Tokenizador::operator= (const Tokenizador& t)
@@ -172,396 +201,1510 @@ void print_list(list<string>& cadena) {
 
 }
 
-void TokenizarCasosEspeciales( const string& str, list<string>& tokens )
-{
-	// True start of index, to be able to come back in case
-	// we advance i under a pressumption that later becomes false
-	int token_start = 0;
-	int at_position = 0;
-	
-	// army of flags
-	bool canBeUrl 				= true,
-		 		start_checked 	= false,
-		 canBeDecimal 			= false,
-				heading_zero 	= false,
-				just_dot 		= false,
-		 canBeEmail 			= true,
-		 		after_at 		= false,
-		 canBeAcronym 			= true,
-		 canBeMultiword 		= true;
+bool Tokenizador::Tokenizar_url( const string& str, list<string>& tokens, int& i, string& curr_token) const {
 
-	string curr_token = "";
-	string aux;
+	// Comprobar si es url
+	// http: o https:
+	//if( str[i]=='h' ) {
 
-	enum casosEspeciales estado;
+	char c;
 
-	// LOOPING THROUGH ENTIRE STRING
-	for( int i=0 ; i < str.size(); i++ ) {   	
+		if( (str.size()-i)>=5 && ((str[i+1]=='t') & (str[i+2]=='t') & (str[i+3]=='p')) ) {
 
-		read_start:
+			if( str[i+4]==':' ) {   
+				curr_token = "http:";											// http:
+				i += 5;
+				goto read_url;
+			}
+			if( ( str.size()-i )>=6 && (str[i+4]=='s') & (str[i+5]==':') ) { 	// https:
+				curr_token = "https:";
+				i += 6;
+				goto read_url;
+			}
+		}
+		//return false;
+	//}
+	// ftp:
+	//if( str[i]=='f' ) {
 
-		print_list(tokens);
-		cout << "i: " << i << endl;
+		if( (str.size()-i)>=4 && ((str[i+1]=='t') & (str[i+2]=='p')) ) { 		// ftp:
+			curr_token = "ftp:";
+			i += 4;
+			goto read_url;
+		}
+	//}
+	return false;
 
-		estado = UDEAM;
-		curr_token.clear();
-		token_start = i;
-		just_dot = after_at = heading_zero = at_position = 0;
+	read_url:
 
-		// TODO not that
-		if( string(str, i, i+4) == "ftp:" ) 
-			curr_token = string(str,i,i+4);
-		else if( string(str, i, i+5) == "http:" ) 
-			curr_token = string(str,i,i+5);
-		else if( string(str, i, i+6) == "https:" ) 
-			curr_token = string(str,i,i+6);
-		else
-			estado = DEAM;
- 
-		canBeEmail 		= (str[i] != '@');
-		canBeAcronym 	= delimiters['.']; 	// thats literally it
-		canBeMultiword 	= delimiters['-']; 	// thats literally it
-
-		switch( estado ) {
-
-			// CHECK URL: cant fuck this up
-			case UDEAM:
-				cout << "enter url" << endl;
-				for( ; i<str.size(); i++ ) {
-			
-					switch( str[i] ) {
-
-						case '_':
-						case ':':
-						case '/':
-						case '.':
-						case '?':
-						case '&':
-						case '-':
-						case '=':
-						case '#':
-						case '@': 								// allowed character
-							curr_token += conversion[str[i]];
-							break;
-
-						default:
-							if( delimiters[str[i]] ) {   		// true delimiter, token over
-								
-								tokens.push_back(curr_token);
-								goto end;
-							}
-							else  								// content 
-								curr_token += conversion[str[i]];
-					}
-				}
+	for( ; i<str.size(); i++ ) {
 		
-				break;
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else
+			c = str[i];
 
-			// CHECK DECIMAL
-			case DEAM:	
-				cout << "enter decimal" << endl;	
-				// remove heading .,
-				while( i<str.size() ) {
-					//cout << "decimal i: " << i << endl;
-					switch( str[i] ) {
 
-						case '.': 
-						case ',':
-							if( delimiters[','] )
-								canBeAcronym = false;
-							i++;
-							break;
-						case 0: case 1: case 2: case 3: case 4:
-						case 5: case 6: case 7: case 8: case 9:
-							goto decimal_correct;
-						default:
-							estado = EAM;
-							goto read_email;
+		if( delimitadores[c] & !exceptions[c]>=2 ) {  // "http:" y un url correcto se guardan igual
+			tokens.push_back(curr_token);
+			return true;
+		}
+		else
+			curr_token += c;
+	}
+	// si has llegado aqui, estas al final del string
+	tokens.push_back(curr_token);
+	return true;	
+}
 
-					}   
-				}
-				decimal_correct:
-				// ...except for one
-				if( token_start!=i ) {
-					//cout << curr_token << "-> dassit" << endl;
-					curr_token += '0' + str[i-1];
-					canBeEmail = after_at; 
-					//cout << "dec crr_token: " << curr_token << endl;
-				}
+bool Tokenizador::Tokenizar_decimal( const string& str, list<string>& tokens, int& i, string& curr_token, bool heading_zero ) const {
 
-				// read rest of number
-				for( ; i<str.size(); i++ ) {
+	char c;
+	bool just_dot=false;
+	int token_start=i;
 
-					switch( str[i] ) {
+	if( heading_zero ) {
 
-						case ',':
-							if( delimiters[','] )
-								canBeAcronym = false;
-							
-						case '.':
+		// remove heading .,
+		for( ; i<str.size(); i++ ) {
 
-							if( !just_dot ) { 					// single dot, we continue
+			c = str[i];
+			switch( c ) {
 
-								just_dot = true;
-								curr_token += str[i];
-							}
+				//case ',':
+				//	canBeAcronym = false;
+				case '.':
+					break;
 
-							else if( delimiters[str[i]] ) { 		// repeated dots, token over (at i-1)
-								
-								tokens.push_back(string(curr_token, 0, curr_token.size()-1));
-								i--;
-								goto read_start; 				// (not end bc we dont want i incremented)
+				case 0: case 1: case 2: case 3: case 4:
+				case 5: case 6: case 7: case 8: case 9:
+					i--;
+					curr_token = "0" + c;
+					goto decimal_correct;
 
-							}
-							else {   							// repeated dots, not delimited but not decimal
-								//curr_token += conversion[str[i]];
-								// let email take care of this one
-								estado = EAM;
-								//cout << "no, jumpin here" << endl;
-								goto read_email;
-							}
+				default:
 
-							break;
-
-						case '0': case '1': case '2': case '3': case '4':
-						case '5': case '6': case '7': case '8': case '9': 								
-							// content
-							curr_token += str[i];
-							just_dot = false;
-							break;
-						case '@':
-							after_at = true;
-
-						default:
-							if( delimiters[str[i]] ) {  		// true delimiter
-
-								tokens.push_back(curr_token);
-								goto end;
-
-							}
-							else { 								// not delimited but not decimal
-								//curr_token += conversion[str[i]];
-								// let email take care of this one
-								estado = EAM;
-								//cout << "jumpin here" << endl;
-								goto read_email;
-							}
+					if( delimitadores[c] ) {   // ...,.,.,- 
+						i++;
+						return false;
 					}
+					return false; 			// ...,.,.a
+			}
+		}	
+	}
+	
+	decimal_correct:
+	
+	// 123.123,123.123,123.123,123.a  <== el caso con el que tuve pesadillas anoche
+	// TODO esperar a los tests
+	
+	// Leer resto del número
+	/// TODO Si te encuentras una coma intermedia, hay que guardar su posición para cortar ahí en caso de que el decimal falle
+	for( ; i<str.size(); i++ ) {
+
+		//cout << "iteration " << i << " (" << str[i] << ")" << endl;
+		c = str[i];
+		switch(c) {
+
+			case ',':  // TODO
+			case '.':
+				if( just_dot ) {   // its a normal token
+					tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+					i--;
+					return true;
 				}
-
-				break;
-
-			// CHECK EMAIL
-			case EAM:
-				read_email:
-				cout << "enter email" << endl;	
-
-				if( canBeEmail ) { // TODO comprobar canbeacronym still true
-					// loop before @
-					cout << i << " " << str.size() << endl;
-					for( ; i<str.size(); i++ ) {
-
-						//cout << "at i " << i << endl;
-						switch( str[i] ) {
-							case '.':  					// not an email
-								goto read_acronym;
-							
-							case '-': 					// not an email
-								
-								if( delimiters['-'] ) {
-									estado = M;
-									goto read_multiword;
-								}
-								else {
-									estado = AM;
-									goto read_acronym;
-								}
-							
-							case '_': 					// not an email
-								if( delimiters['_'] ) { // delimited as regular token
-									tokens.push_back(curr_token);
-									goto end;
-								}
-								else {				// could still be AM
-									estado = AM;
-									goto read_acronym;
-								}
-							case '@':
-								at_position = i * delimiters['@'];  // terminamos este bucle
-								i++;
-								goto after_at_loop;
-
-							default:
-								if( delimiters[str[i]] )  {	// not an email
-									estado = AM;
-									goto read_acronym;
-								}
-								
-								else {					// filler character
-									curr_token += conversion[str[i]];
-									//cout << "curr token is " << curr_token << endl;
-								}
-						}							
-					}
-					// loop after @
-					after_at_loop:
-					for( ; i<str.size(); i++ ) {
-						
-						switch( str[i] ) {
-
-							case '@':   						
-								if( delimiters['@'] ) {  		// delimits
-									tokens.push_back(string(curr_token, 0, curr_token.size()-1));
-									goto end;
-								}
-								else { 							// not an email anymore, not delimited
-									curr_token += '@';
-									goto read_acronym;
-								}
-								break;
-
-							case '-': // if delim, acron would NOT like that
-							case '_': // TODO tienen que ir por enmedio de caracteres normales
-								canBeAcronym = !delimiters[str[i]];
-
-							case '.': 
-								if( just_dot ) { // not an email anymore
-
-									if( delimiters['@'] ) { // cortamos en el @
-										tokens.push_back(string(curr_token, 0, at_position));
-										i = at_position;
-										goto end;
-									}
-								}
-								else
-									just_dot = true;
-
-
-								curr_token += str[i];
-								break;
-							
-							default:
-								// check delimiter
-								if( delimiters[str[i]] ) { 
-									
-									// arios@&
-									if( at_position == i ) { // Not an email
-										
-										tokens.push_back(string(curr_token, 0, curr_token.size()-1));
-										goto end;
-									}
-									// arios@iuii&
-									else { 								// true delimiter
-										tokens.push_back(curr_token);
-										goto end;
-									}
-								}
-								else { 									// filler character
-									just_dot = false;
-									curr_token += conversion[str[i]];
-								}
-								break;
-
-						}
-
-					}
-
-
-				}
-				break;
-
-			// check acronym
-			case AM:
-				read_acronym:
-				printf("enter acronym (%d)\n", i);	
-
-				if( canBeAcronym ) {
-					for( ; i<str.size(); i++ ) {
-
-						switch( str[i] ) {
-							case '.':
-								if( just_dot ) { // not an acronym anymore
-
-									tokens.push_back(string(curr_token, 0, curr_token.size()-1));
-									goto end;
-								}
-								else {
-									just_dot = true;
-									curr_token += '.';
-								}
-								break;
-							default: 		// filler character
-							
-								if( delimiters[str[i]] ) { // true delimiter
-									
-									tokens.push_back(string(curr_token, 0, curr_token.size()-just_dot));
-									//i++;
-									goto end;
-								}
-								just_dot = false;
-								curr_token += conversion[str[i]];
-								break;
-						}
-					}
-				} 
-				else
-					goto read_multiword;
-				break;
-
-			// check multiword
-			case M:
-				read_multiword:
-				cout << "enter multiw" << endl;	
-
-				if( canBeMultiword ) {
-
-					for( ; i<str.size(); i++ ) {
-
-						switch( str[i] ) {
-							case '-':
-								if( just_dot ) { // not a multiword anymore
-
-									tokens.push_back(string(curr_token, 0, curr_token.size()-1));
-									goto end;
-								}
-								else {
-									just_dot = true;
-									curr_token += '-';
-								}
-								break;
-							default: 				// filler character
-								
-								if( delimiters[str[i]] ) {
-									tokens.push_back(curr_token);
-									goto end;
-								}
-								just_dot = false;
-								curr_token += conversion[str[i]];
-								break;
-						}
-
-					}
-				}
-				else
-					goto read_token;
-				break;
+				just_dot = true;
+				curr_token += c;
+				continue;
+			
+			case '0': case '1': case '2': case '3': case '4':
+			case '5': case '6': case '7': case '8': case '9':
+				just_dot = false;
+				curr_token += c;
+				continue;
 
 			default:
-				read_token:
-				for( ; i<str.size(); i++ ) { 		// just read until delim or EOS
-					if( delimiters[str[i]] ) {
-						tokens.push_back(curr_token);
-						goto end;
+				//cout << "encountered " << c << endl;
+
+				if( delimitadores[c] ) {  // 123,23- ó 123,23& Delimit right here
+					
+					if( just_dot ) { // 123.&
+
+						//cout << "pushing " << tokens.back() << endl;
+						tokens.push_back( string(curr_token, 0, curr_token.size()-1) );
+						i++;
+						return true;
+
 					}
-					curr_token += conversion[str[i]];
+					//cout << "pushing " << tokens.back() << endl;
+
+					i++;
+					tokens.push_back(curr_token);
+					return true;
 				}
-				tokens.push_back(curr_token);
-					goto end;
+				else {  // 123,3a 123.34,123a ABORT, nunca fue un decimal. Es un acronimo que se cortaba en la coma.
+
+					//cout << "holy shit is it you" << endl;
+					i=token_start;
+					curr_token.clear();
+					return false;   // provisional
+
+				}
 		}
+	}
+	if( !just_dot ) 
+		tokens.push_back(curr_token);
+	else  // sda@a.a__
+		tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+	
+	return true;
+}
 
+// si te encuentras un delimitador:
+// 										. -> AO desde el principio era un acronimo
+// 										- -> MO desde el principio era una multipalabra
+// 										_ -> O, cortar
+// 								otherwise -> O, cortar
+ // si no es un delimitador,
+//  									no reaction
+// DESPUES DE @, si ya has encontrado al menos un caracter, you cant fuck this up.
+// si te encuentras un delimitador:
+// 						 			  .-_ -> allowed solo si van RODEADOS de caracteres normales.
+// 											
 
-		end:
-			continue;
+bool Tokenizador::Tokenizar_email_O( const string& str, list<string>& tokens, int& i, string& curr_token) const {
+	
+	int at_position;
+	int token_start = i;
+	char c;
+
+	for( ; i<str.size(); i++ ) {
+	
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else
+			c = str[i];
+
+		switch( c ) {
+
+			case '@':
+				at_position = i-token_start;  // relativo a curr_token
+				i++;
+				goto after_at;
+
+			default:
+				if( delimitadores[c] ) {  // not email. Over right here.
+
+					tokens.push_back(curr_token);
+					i++;
+					return true;
+				}
+				else 						// content
+					curr_token += c;
+		}
+	}
+
+	// has llegado al final del string y no era un email, era un token sin mas.
+	tokens.push_back(curr_token);
+	return true;
+
+	after_at:
+
+	if( delimitadores[str[i]] ) {   // sdasda@{.-_@ or other delimiter} Not an email anymore, delimited at previous @
+
+		tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+		i++;
+		return true;
+	}
+
+	bool just_dot = false;
+
+	// read rest of email
+	for( ; i<str.size(); i++ ) {
+
+		c = str[i];
+		switch( c ) {
+
+			case '_':
+				if( !delimitadores[c] ) 
+					curr_token += c;
+				
+				else if( !just_dot ) {
+					just_dot = true;
+					curr_token += c;
+				}
+				else { 		// sda@a__ | sad@a_a_a__a  gets delimited at ..
+
+					tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+					i++; // get placed after delimitadores
+					return true;
+				}
+				break;
+			
+			case '@':   // bro is NOT an email. Cortamos el token en el @ y del resto se encarga otro
+				tokens.push_back(string(curr_token, 0, at_position));
+				i = token_start + at_position + 1; // ponernos justo después del @
+				return true;
+
+			default:
+				if( !delimitadores[c] )   	// content
+					curr_token += c;
+				
+				else { 					// terminar
+					if( !just_dot ) 
+						tokens.push_back(curr_token);
+				
+					else  // quitar un delimitador especial puesto al final()
+						tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+					
+					i++;
+					return true;
+				}
+		}
+	}
+	// si has llegado aqui, estas al final del string
+
+	// sda@a.a.a.
+	if( !just_dot ) 
+		tokens.push_back(curr_token);
+	else  // sda@a.a__
+		tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+	
+	return true;
+}
+
+bool Tokenizador::Tokenizar_email_A( const string& str, list<string>& tokens, int& i, string& curr_token, bool& canBeAcronym ) const {
+	
+	int at_position;
+	int token_start = i;
+	char c;
+
+	i = str.find_first_not_of(this->delimiters, i);
+	if( i==str.npos ) return false;
+
+	for( ; i<str.size(); i++ ) {
+	
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else
+			c = str[i];
+
+		//printf("email %c\n", c);
+
+		switch( c ) {
+
+			case '.':  // no era un email, aún podría ser un acrónimo.  Acronimo tendrá que comprobar si curr_token está vacío o no.
+				curr_token.append(1, c);
+				//cout << "boutta return " << curr_token << endl;
+				canBeAcronym = true;
+				return false;
+
+			case '@':
+				at_position = i-token_start;  // relativo a curr_token
+				i++;
+				goto after_at;
+
+			default:
+				if( delimitadores[c] ) {  // not email. Over right here.
+
+					tokens.push_back(curr_token);
+					i++;
+					return true;
+				}
+				else 						// content
+					curr_token += c;
+		}
+	}
+
+	// has llegado al final del string y no era un email, era un token sin mas.
+	tokens.push_back(curr_token);
+	return true;
+
+	after_at:
+
+	if( delimitadores[str[i]] ) {   // sdasda@{.-_@ or other delimiter} Not an email anymore, delimited at previous @
+
+		tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+		i++;
+		return true;
+	}
+
+	bool just_dot = false;
+
+	// read rest of email
+	for( ; i<str.size(); i++ ) {
+
+		c = str[i];
+		switch( c ) {
+
+			case '.':
+				if( !just_dot ) {
+					just_dot = true;
+					curr_token += c;
+				}
+				else { 		// sda@a__ | sad@a_a_a__a  gets delimited at ..
+
+					tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+					i-=2; // get placed before dots
+					return true;
+				}
+				break;
+			case '_':
+				if( !delimitadores[c] ) 
+					curr_token += c;
+				
+				else if( !just_dot ) {
+					just_dot = true;
+					curr_token += c;
+				}
+				else { 		// sda@a__ | sad@a_a_a__a  gets delimited at ..
+
+					tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+					i++; // get placed after delimitadores
+					return true;
+				}
+				break;
+			
+			case '@':   // bro is NOT an email. Cortamos el token en el @ y del resto se encarga otro
+				tokens.push_back(string(curr_token, 0, at_position));
+				i = token_start + at_position + 1; // ponernos justo después del @
+				return true;
+
+			default:
+				if( !delimitadores[c] )   	// content
+					curr_token += c;
+				
+				else { 					// terminar
+					if( !just_dot ) 
+						tokens.push_back(curr_token);
+				
+					else  // quitar un delimitador especial puesto al final()
+						tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+					
+					i++;
+					return true;
+				}
+		}
+	}
+	// si has llegado aqui, estas al final del string
+
+	// sda@a.a.a.
+	if( !just_dot ) 
+		tokens.push_back(curr_token);
+	
+	else  // sda@a.a..
+		tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+	return true;
+}
+
+bool Tokenizador::Tokenizar_email_M( const string& str, list<string>& tokens, int& i, string& curr_token, bool& canBeMultiword ) const {
+	
+	int at_position;
+	int token_start = i;
+	char c;
+
+	for( ; i<str.size(); i++ ) {
+	
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else
+			c = str[i];
+
+		switch( c ) {
+
+			case '-':  // no era un email, aún podría ser un multiword.  Multiword tendrá que comprobar si curr_token está vacío o no.
+				curr_token += c;
+				canBeMultiword = true;
+				return false;
+
+			case '@':
+				at_position = i-token_start;  // relativo a curr_token
+				i++;
+				goto after_at;
+
+			default:
+				if( delimitadores[c] ) {  // not email. Over right here.
+
+					tokens.push_back(curr_token);
+					i++;
+					return true;
+				}
+				else 						// content
+					curr_token += c;
+		}
+	}
+
+	// has llegado al final del string y no era un email, era un token sin mas.
+	tokens.push_back(curr_token);
+	return true;
+
+	after_at:
+
+	if( delimitadores[str[i]] ) {   // sdasda@{.-_@ or other delimiter} Not an email anymore, delimited at previous @
+
+		tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+		i++;
+		return true;
+	}
+
+	bool just_dot = false;
+
+	// read rest of email
+	for( ; i<str.size(); i++ ) {
+
+		c = str[i];
+		switch( c ) {
+
+			case '-':
+				if( !just_dot ) {
+					just_dot = true;
+					curr_token += c;
+				}
+				else { 		// sda@a__ | sad@a_a_a__a  gets delimited at ..
+
+					tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+					i++; // get placed before dashes
+					return true;
+				}
+				break;
+			case '_':
+				if( !delimitadores[c] ) 
+					curr_token += c;
+				
+				else if( !just_dot ) {
+					just_dot = true;
+					curr_token += c;
+				}
+				else { 		// sda@a__ | sad@a_a_a__a  gets delimited at ..
+
+					tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+					i++; // get placed after delimitadores
+					return true;
+				}
+				break;
+			
+			case '@':   // bro is NOT an email. Cortamos el token en el @ y del resto se encarga otro
+				tokens.push_back(string(curr_token, 0, at_position));
+				i = token_start + at_position + 1; // ponernos justo después del @
+				return true;
+
+			default:
+				if( !delimitadores[c] )   	// content
+					curr_token += c;
+				
+				else { 					// terminar
+					
+					if( !just_dot ) 
+						tokens.push_back(curr_token);
+					
+					else  // quitar un delimitador especial puesto al final()
+						tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+					
+					i++;
+					return true;
+				}
+		}
+	}
+	// si has llegado aqui, estas al final del string
+
+	// sda@a.a.a.
+	if( !just_dot ) 
+		tokens.push_back(curr_token);
+	
+	else  // sda@a.a{--,__}
+		tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+	
+	return true;
+}
+
+bool Tokenizador::Tokenizar_email_AM( const string& str, list<string>& tokens, int& i, string& curr_token, bool& canBeAcronym, bool& canBeMultiword ) const {
+	
+	int at_position;
+	int token_start = i;
+	char c;
+
+	i = str.find_first_not_of(this->delimiters,i);
+	if( i==str.npos ) return false;
+
+	for( ; i<str.size(); i++ ) {
+	
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else
+			c = str[i];
+
+		c = str[i];
+		switch( c ) {
+
+			case '.': 	// no era un email, aún podría ser un acronimo.  Acronimo tendrá que comprobar si curr_token está vacío o no.
+				curr_token += c;
+				canBeAcronym = true;
+				return false;
+			case '-':  	// no era un email, aún podría ser un multiword.  Multiword tendrá que comprobar si curr_token está vacío o no.
+				curr_token += c;
+				canBeMultiword = true;
+				return false;
+
+			case '@':
+				at_position = i-token_start;  // relativo a curr_token
+				i++;
+				goto after_at;
+
+			default:
+				if( delimitadores[c] ) {  // not email. Over right here.
+
+					tokens.push_back(curr_token);
+					i++;
+					return true;
+				}
+				else 						// content
+					curr_token += c;
+		}
+	}
+
+	// has llegado al final del string y no era un email, era un token sin mas.
+	tokens.push_back(curr_token);
+	return true;
+
+	after_at:
+
+	if( delimitadores[str[i]] ) {   // sdasda@{.-_@ or other delimiter} Not an email anymore, delimited at previous @
+
+		tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+		i++;
+		return true;
+	}
+
+	bool just_dot = false;
+
+	// read rest of email
+	for( ; i<str.size(); i++ ) {
+
+		c = str[i];
+		switch( c ) {
+
+			case '.':
+			case '-':
+				if( !just_dot ) {
+					just_dot = true;
+					curr_token += c;
+				}
+				else { 		// sda@a__ | sad@a_a_a__a  gets delimited at ..
+
+					tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+					i++; // get placed before dashes
+					return true;
+				}
+				break;
+			case '_':
+				if( !delimitadores[c] ) 
+					curr_token += c;
+				
+				else if( !just_dot ) {
+					just_dot = true;
+					curr_token += c;
+				}
+				else { 		// sda@a__ | sad@a_a_a__a  gets delimited at ..
+
+					tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+					i++; // get placed after delimitadores
+					return true;
+				}
+				break;
+			
+			case '@':   // bro is NOT an email. Cortamos el token en el @ y del resto se encarga otro
+				tokens.push_back(string(curr_token, 0, at_position));
+				i = token_start + at_position + 1; // ponernos justo después del @
+				return true;
+
+			default:
+				if( !delimitadores[c] )   	// content
+					curr_token += c;
+				
+				else { 					// terminar
+					
+					if( !just_dot ) 
+						tokens.push_back(curr_token);
+					
+					else  // quitar un delimitador especial puesto al final()
+						tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+					
+					i++;
+					return true;
+				}
+		}
+	}
+	// si has llegado aqui, estas al final del string
+
+	// sda@a.a.a.
+	if( !just_dot ) 
+		tokens.push_back(curr_token);
+	
+	else  // sda@a.a{--,__}
+		tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+	
+	return true;
+}
+
+bool Tokenizador::Tokenizar_acronimo( const string& str, list<string>& tokens, int&i, string& curr_token ) const {
+
+	int token_start = i;
+	bool just_dot = false;
+
+	char c;
+	just_dot = !curr_token.empty();
+	i+=just_dot;
+	//cout << "dentro con i " << i << endl; 
+	// de quitar puntos del principio se ha encargado decimal
+
+	// si estamos aqui, es porque sabemos 100%, por lo que sea, que no es un email
+	for( ; i<str.size(); i++ ) {
+
+		//cout << i << " " << str[i] << endl;
+		
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else
+			c = str[i];
+
+		switch( c ) {
+
+			case '.':
+				if( just_dot ) {  // no longer an acronym. Previous dot delimits   a.c..5bc
+
+					tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+					//i--;
+					return true;
+				}
+				else {
+					just_dot = true;
+					curr_token += '.';
+					//i++;
+				}
+				break;
+
+			case '-':   // not an acronym, could be multiword
+				if( delimitadores['-'] ) 
+					return false;
+
+			default:
+				if( delimitadores[c] ) { 		
+					
+					//cout << "retrninggg" << endl;
+					if( just_dot ) {
+						tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+						i++;
+						return true;
+					}
+					tokens.push_back(curr_token);
+
+					//cout << curr_token << endl;
+					i++;
+					return true;
+				}
+				else {
+					just_dot = false;
+					curr_token += c;
+					//i++;
+				}
+		}
+	}
+	// si has llegado aqui, estas al final del string
+	tokens.push_back(curr_token);
+	return true;
+}
+
+bool Tokenizador::Tokenizar_multipalabra( const string& str, list<string>& tokens, int&i, string& curr_token ) const {
+
+	bool just_dash=false;
+	char c;
+	
+	just_dash = !curr_token.empty();
+	i += just_dash;
+
+	if( curr_token.empty() ) { 				// hay que quitar guiones del principio (si los hay)
+
+		for( ; i<str.size(); i++ ) {
+
+			if( str[i]!='-' ) {
+				if( delimitadores[str[i]] )     // ----& 
+						return false;
+				else
+					break;
+			}
+		}
+	}
+	for( ; i<str.size(); i++ ) {
+
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else
+			c = str[i];
+
+		if( c!='-' ) {
+
+			if( delimitadores[c] ) {
+				tokens.push_back(curr_token);
+				return true;
+			}
+			just_dash = false; 				// content character
+			curr_token += c;
+		}
+		else {
+			if( just_dash ) { 				// not a multiword anymore, delimited at previous 
+
+				tokens.push_back(string(curr_token, 0, curr_token.size()-1));
+				i++;
+				return true;
+			}
+			else {
+				just_dash = true;
+				curr_token += '-';
+			}
+		}
+	}
+	// si has llegado aqui, estas al final del string
+	tokens.push_back(curr_token);
+	return true;
+}
+
+void Tokenizador::Tokenizar_token_normal( const string& str, list<string>& tokens, int& i, string& curr_token ) const {
+	
+	//printf("entrando a token normal\n");
+
+	char c;
+
+	for( ; i<str.size(); i++ ) {
+
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else
+			c = str[i];
+
+		if( delimitadores[c] ) {
+			tokens.push_back(curr_token);
+			i++;
+			return;
+		}
+		else
+			curr_token += c;
+	}
+	// si has llegado aqui, estas al final del string
+	tokens.push_back(curr_token);
+	return;
+}
+
+// army of methods para ahorrarme ifs. Despues de la _ indica cuales son delimitadores
+void Tokenizador::TokenizarCasosEspeciales_U( const string& str, list<string>& tokens ) const {
+
+	// URL 			Y
+	// Decimal 		N 
+	// Email 		N
+	// Acronimo 	N 		
+	// Multiw 		N
+	
+	int i=0;
+	char c;
+	string curr_token;
+
+	//printf("tokenizando casos especiales U\n");
+
+	while( i<str.size() ) {
+
+		curr_token.clear();
+		
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else
+			c = str[i];
+
+		switch(c) {
+
+			case 'h':
+			case 'f':
+				if (Tokenizar_url(str,tokens, i, curr_token))
+					continue;
+				else
+					goto token;
+				
+			default:
+				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
+					i = str.find_first_not_of(this->delimiters,i);
+					if( i == str.npos ) return;
+					continue;
+				}
+				token:
+				Tokenizar_token_normal(str, tokens, i, curr_token);
+		}
+	}
+}
+
+void Tokenizador::TokenizarCasosEspeciales_UA( const string& str, list<string>& tokens ) const {
+
+	// URL 			Y
+	// Decimal 		N (.,)
+	// Email 		N
+	// Acronimo 	Y 		
+	// Multiw 		N
+
+	int i=0;
+	char c;
+	string curr_token;
+	bool canBeAcronym;
+	
+	while( i<str.size() ) {
+
+		canBeAcronym = false;
+		curr_token.clear();
+		c = str[i];
+
+		switch(c) {
+
+			case 'h':
+			case 'f':
+				if ( Tokenizar_url(str, tokens, i, curr_token) )  // http:,
+					continue;
+			
+			default:
+
+				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
+					i = str.find_first_not_of(this->delimiters,i);
+					if( i == str.npos ) return;
+					continue;
+				}
+
+				if( canBeAcronym && Tokenizar_acronimo(str, tokens, i, curr_token) )
+					continue;
+
+				Tokenizar_token_normal(str, tokens, i, curr_token);
+				//continue;
+		}
+	}
+}
+
+void Tokenizador::TokenizarCasosEspeciales_UE( const string& str, list<string>& tokens ) const {
+
+	// URL 			Y
+	// Decimal 		N
+	// Email 		Y
+	// Acronimo 	N		
+	// Multiw 		N
+
+	int i=0;
+	char c;
+	string curr_token="";
+
+	while( i<str.size() ) {
+
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else 
+			c = str[i];
+		
+		switch(c) {
+
+			case 'h':
+			case 'f':
+				if (Tokenizar_url(str,tokens, i, curr_token))
+					continue;
+			case '@':
+				i++;
+				continue;
+
+			default:
+				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
+					i = str.find_first_not_of(this->delimiters,i);
+					if( i == str.npos ) return;
+					continue;
+				}
+				if( Tokenizar_email_O(str, tokens, i, curr_token) )
+					continue;
+
+				Tokenizar_token_normal(str, tokens, i, curr_token);
+		}
+	}
+}
+
+void Tokenizador::TokenizarCasosEspeciales_UME( const string& str, list<string>& tokens ) const {
+
+	// URL 			Y
+	// Decimal 		N
+	// Email 		Y
+	// Acronimo 	N		
+	// Multiw 		N
+
+	int i=0;
+	char c;
+	string curr_token;
+	bool canBeMultiw;
+
+	while( i<str.size() ) {
+
+		canBeMultiw = false;
+		curr_token.clear();
+
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else 
+			c = str[i];
+
+		switch(c) {
+
+			case 'h':
+			case 'f':
+				if (Tokenizar_url(str,tokens, i, curr_token))
+					continue;
+
+			case '@':
+				i++;
+				continue;
+
+			default:
+				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
+					i = str.find_first_not_of(this->delimiters,i);
+					if( i == str.npos ) return;
+					continue;
+				}
+				if( Tokenizar_email_M(str, tokens, i, curr_token, canBeMultiw) ) // te lo ha empezado 100%, si hay un guion entonces se comprueba multiw
+					continue;
+
+				if( canBeMultiw && Tokenizar_multipalabra(str, tokens, i, curr_token) )
+					continue;
+
+				Tokenizar_token_normal(str, tokens, i, curr_token);
+		}
+	}
+}
+
+void Tokenizador::TokenizarCasosEspeciales_UDA( const string& str, list<string>& tokens ) const {
+
+	// URL 			Y
+	// Decimal 		Y
+	// Email 		N
+	// Acronimo 	Y, N al encontrar una coma 		
+	// Multiw 		N
+
+	int i=0;
+	char c;
+	string curr_token;
+	bool canBeAcronym, heading_dot;
+	
+	while( i<str.size() ) {
+		
+		heading_dot = false;
+		curr_token.clear();
+
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else 
+			c = str[i];
+		
+		switch(c) {
+
+			case 'h':
+			case 'f':
+				if (Tokenizar_url(str,tokens, i, curr_token))
+					continue;
+				else
+					goto acronimo;
+			
+			case ',':
+				//canBeAcronym=false;
+			case '.':
+				heading_dot = true;
+			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
+			case '5': case '6': case '7': case '8': case '9': 
+				
+				if( Tokenizar_decimal( str, tokens, i, curr_token, heading_dot ) ) // quitará la coma inicial si falla
+					continue;
+				
+			default:
+			
+				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
+					i = str.find_first_not_of(this->delimiters,i);
+					if( i == str.npos ) return;
+					continue;
+				}
+				acronimo:
+				if( Tokenizar_acronimo(str, tokens, i, curr_token) ) 
+					continue;
+
+				Tokenizar_token_normal(str, tokens, i, curr_token);
+		}
+	}
+}
+
+void Tokenizador::TokenizarCasosEspeciales_UMA( const string& str, list<string>& tokens ) const {
+
+	// URL 			Y
+	// Decimal 		N (.,)
+	// Email 		N
+	// Acronimo 	Y 		
+	// Multiw 		N
+
+	int i=0;
+	char c;
+	string curr_token;
+	
+	while( i<str.size() ) {
+
+		curr_token.clear();
+		
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else 
+			c = str[i];
+
+		switch(c) {
+
+			case 'h':
+			case 'f':
+				if ( Tokenizar_url(str, tokens, i, curr_token) )  // http:,
+					continue;
+			
+			default:
+
+				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
+					i = str.find_first_not_of(this->delimiters,i);
+					if( i == str.npos ) return;
+					continue;
+				}
+
+				if( Tokenizar_acronimo(str, tokens, i, curr_token) )
+					continue;
+
+				if( Tokenizar_multipalabra(str, tokens, i, curr_token) )
+					continue;
+
+				Tokenizar_token_normal(str, tokens, i, curr_token);
+				//continue;
+		}
+	}
+}
+
+void Tokenizador::TokenizarCasosEspeciales_UAE( const string& str, list<string>& tokens ) const {
+
+	// URL 			Y
+	// Decimal 		N
+	// Email 		Y
+	// Acronimo 	Y 		
+	// Multiw 		N
+
+	//cout << "entrando en UAE" << endl;
+
+	int i=0;
+	char c;
+	string curr_token;
+	bool canBeAcronym;
+
+	while( i<str.size() ) {
+
+		curr_token.clear();
+		canBeAcronym = false;
+
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else 
+			c = str[i];
+
+		switch(c) {
+
+			case 'h':
+			case 'f':
+				//printf("intentando url\n");
+				if (Tokenizar_url(str,tokens, i, curr_token))
+					continue;
+			case '@':
+				i++;
+				continue;
+
+			default:
+				//printf("intentando default\n");
+
+				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador de los normales
+					i = str.find_first_not_of(this->delimiters,i);
+					if( i == str.npos ) return;
+					continue;
+				}
+				//printf("intentando email %d\n", i);
+
+				if( Tokenizar_email_A(str, tokens, i, curr_token, canBeAcronym) )
+					continue;
+					//printf("intentando acronimo (%d), (%s)\n", canBeAcronym, curr_token);
+				
+				//cout << "intentando acronimo (" << curr_token << ")" << endl;
+
+				if ( canBeAcronym && Tokenizar_acronimo(str, tokens, i, curr_token) ) {
+					//cout << "i al salir: " << i << endl;
+					continue;
+				}
+					
+				//printf("intentando normal\n");
+
+				Tokenizar_token_normal(str, tokens, i, curr_token);
+		}
+	}
+}
+
+void Tokenizador::TokenizarCasosEspeciales_UDAE( const string& str, list<string>& tokens ) const {
+
+	// URL 			Y
+	// Decimal 		Y
+	// Email 		N
+	// Acronimo 	Y		
+	// Multiw 		N
+
+	int i=0;
+	char c;
+	string curr_token;
+	bool canBeAcronym, heading_dot;
+	
+	while( i<str.size() ) {
+		
+		curr_token.clear();
+		canBeAcronym = true, heading_dot = false;
+
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else 
+			c = str[i];
+		
+		switch(c) {
+
+			case 'h':
+			case 'f':
+				if (Tokenizar_url(str,tokens, i, curr_token))
+					continue;
+				else
+					goto rest;
+			
+			case '@':
+				i++;
+				continue;
+
+			case ',':
+				//canBeAcronym=false;
+			case '.':
+				heading_dot = true;
+			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
+			case '5': case '6': case '7': case '8': case '9': 
+				
+				if( Tokenizar_decimal( str, tokens, i, curr_token, heading_dot ) ) { // quitará la coma inicial si falla
+					//cout << "pushed element " << tokens.back() << endl;
+					continue;
+				}
+				
+			default:
+			
+				rest:
+				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
+					i = str.find_first_not_of(this->delimiters,i);
+					if( i == str.npos ) return;
+					continue;
+				}
+				if( Tokenizar_email_A(str, tokens, i, curr_token, canBeAcronym) )
+					continue;
+
+				if( canBeAcronym && Tokenizar_acronimo(str, tokens, i, curr_token) ) 
+					continue;
+
+				Tokenizar_token_normal(str, tokens, i, curr_token);
+		}
+	}
+}
+
+void Tokenizador::TokenizarCasosEspeciales_UM( const string& str, list<string>& tokens ) const {
+
+	// URL 			Y
+	// Decimal 		N
+	// Email 		N
+	// Acronimo 	N		
+	// Multiw 		Y
+
+	int i=0;
+	char c;
+	string curr_token;
+
+	while( i<str.size() ) {
+
+		curr_token.clear();
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else 
+			c = str[i];
+		
+		switch(c) {
+
+			case 'h':
+			case 'f':
+				if (Tokenizar_url(str,tokens, i, curr_token))
+					continue;
+				
+			default:
+				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
+					i = str.find_first_not_of(this->delimiters,i);
+					if( i == str.npos ) return;
+					continue;
+				}
+
+				if( Tokenizar_multipalabra(str, tokens, i, curr_token) )
+					continue;
+
+				Tokenizar_token_normal(str, tokens, i, curr_token);
+		}
+	}
+}
+
+void Tokenizador::TokenizarCasosEspeciales_UDAM( const string& str, list<string>& tokens ) const {
+
+	// URL 			Y
+	// Decimal 		Y
+	// Email 		N
+	// Acronimo 	Y		
+	// Multiw 		N
+
+	int i=0;
+	char c;
+	string curr_token;
+	bool heading_dot;
+	
+	while( i<str.size() ) {
+		
+		curr_token.clear();
+		heading_dot = false;
+
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else 
+			c = str[i];
+		
+		switch(c) {
+
+			case 'h':
+			case 'f':
+				if (Tokenizar_url(str,tokens, i, curr_token))
+					continue;
+				else
+					goto rest;
+			
+			case ',':
+				//canBeAcronym=false;
+			case '.':
+				heading_dot = true;
+			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
+			case '5': case '6': case '7': case '8': case '9': 
+				
+				if( Tokenizar_decimal( str, tokens, i, curr_token, heading_dot ) ) // quitará la coma inicial si falla
+					continue;
+				
+			default:
+			
+				rest:
+				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
+					i = str.find_first_not_of(this->delimiters,i);
+					if( i == str.npos ) return;
+					continue;
+				}
+				
+				if( Tokenizar_acronimo(str, tokens, i, curr_token) ) 
+					continue;
+
+				if( Tokenizar_multipalabra(str, tokens, i, curr_token) )
+					continue;
+
+				Tokenizar_token_normal(str, tokens, i, curr_token);
+		}
+	}
+}
+
+void Tokenizador::TokenizarCasosEspeciales_UMAE( const string& str, list<string>& tokens ) const  {
+
+	// URL 			Y
+	// Decimal 		N
+	// Email 		Y
+	// Acronimo 	Y 		
+	// Multiw 		N
+
+	int i=0;
+	char c;
+	string curr_token;
+	bool canBeAcronym, canBeMultiword;
+
+	while( i<str.size() ) {
+
+		canBeAcronym = canBeMultiword = false;
+		curr_token.clear();
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else 
+			c = str[i];
+		switch(c) {
+
+			case 'h':
+			case 'f':
+				if (Tokenizar_url(str,tokens, i, curr_token))
+					continue;
+			
+			case '@':
+				i++;
+				continue;
+
+			default:
+				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador de los normales
+					i = str.find_first_not_of(this->delimiters,i);
+					if( i == str.npos ) return;
+					continue;
+				}
+
+				if( Tokenizar_email_AM(str, tokens, i, curr_token, canBeAcronym, canBeMultiword) )
+					continue;
+				
+				if ( canBeAcronym && Tokenizar_acronimo(str, tokens, i, curr_token))
+					continue;
+
+				if ( canBeMultiword && Tokenizar_multipalabra(str, tokens, i, curr_token))
+					continue;
+
+				Tokenizar_token_normal(str, tokens, i, curr_token);
+		}
+	}
+
+}
+
+void Tokenizador::TokenizarCasosEspeciales_UDEAM( const string& str, list<string>& tokens ) const {
+
+	// URL 			Y
+	// Decimal 		Y
+	// Email 		N
+	// Acronimo 	Y		
+	// Multiw 		N
+
+	int i=0;
+	char c;
+	string curr_token;
+	bool canBeAcronym, canBeMultiword, heading_dot;
+	
+	while( i<str.size() ) {
+		
+		canBeAcronym = canBeMultiword = heading_dot = false;
+
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else 
+			c = str[i];
+		
+		switch(c) {
+
+			case 'h':
+			case 'f':
+				if (Tokenizar_url(str,tokens, i, curr_token))
+					continue;
+				else
+					goto rest;
+			case '@':
+				i++;
+				continue;
+			case ',':
+				//canBeAcronym=false;
+			case '.':
+				heading_dot = true;
+			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
+			case '5': case '6': case '7': case '8': case '9': 
+				
+				if( Tokenizar_decimal( str, tokens, i, curr_token, heading_dot ) ) // quitará la coma inicial si falla
+					continue;
+				
+			default:
+			
+				rest:
+				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
+					i = str.find_first_not_of(this->delimiters,i);
+					if( i == str.npos ) return;
+					continue;
+				}
+				
+				if( Tokenizar_email_AM(str, tokens, i, curr_token, canBeAcronym, canBeMultiword) ) 
+					continue;
+
+				if( canBeAcronym && Tokenizar_acronimo(str, tokens, i, curr_token) ) 
+					continue;
+
+				if( canBeMultiword && Tokenizar_multipalabra(str, tokens, i, curr_token) )
+					continue;
+
+				Tokenizar_token_normal(str, tokens, i, curr_token);
+		}
+	}
+}
+
+void Tokenizador::TokenizarCasosEspeciales( const string& str, list<string>& tokens ) const
+{
+	// segun los delimitadores mas condicionantes,
+	// manda a una funcion u otra.
+	// para ahorrar ifs dentro de bucles.
+
+	//printf("%d %d %d %d\n", delimitadores['.'], delimitadores[','], delimitadores['-'], delimitadores['@']);
+
+	if( delimitadores['.'] ) {
+
+		if( delimitadores[','] ) {
+
+			if( delimitadores['-'] ) {
+
+				if( delimitadores['@'] )  	this->TokenizarCasosEspeciales_UDEAM(str, tokens);
+					
+				else 						this->TokenizarCasosEspeciales_UDAM(str, tokens);
+			}
+			else {
+				if( delimitadores['@'] )  	this->TokenizarCasosEspeciales_UDAE(str, tokens);
+					
+				else 						this->TokenizarCasosEspeciales_UDA(str, tokens);
+			}
+
+		}
+		else {
+			if( delimitadores['-'] ) {
+
+				if( delimitadores['@'] )  	this->TokenizarCasosEspeciales_UMAE(str, tokens);
+					
+				else 						this->TokenizarCasosEspeciales_UMA(str, tokens);
+			}
+			else {
+				if( delimitadores['@'] )  	this->TokenizarCasosEspeciales_UAE(str, tokens);
+					
+				else 						this->TokenizarCasosEspeciales_UA(str, tokens);
+			}
+		}
+	}
+	else {
+		if( delimitadores[','] ) {
+
+			if( delimitadores['-'] ) {
+
+				if( delimitadores['@'] )  	this->TokenizarCasosEspeciales_UME(str, tokens);
+					
+				else 						this->TokenizarCasosEspeciales_UM(str, tokens);
+			}
+			else {
+				if( delimitadores['@'] )  	this->TokenizarCasosEspeciales_UE(str, tokens);
+					
+				else 						this->TokenizarCasosEspeciales_U(str, tokens);
+			}
+
+		}
+		else {
+			if( delimitadores['-'] ) {
+
+				if( delimitadores['@'] )  	this->TokenizarCasosEspeciales_UME(str, tokens);
+					
+				else 						this->TokenizarCasosEspeciales_UM(str, tokens);
+			}
+			else {
+				if( delimitadores['@'] )  	this->TokenizarCasosEspeciales_UE(str, tokens);
+					
+				else 						this->TokenizarCasosEspeciales_U(str, tokens);
+			}
+		}
 	}
 }
 
@@ -576,12 +1719,12 @@ void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
 		while( string::npos != pos && string::npos != lastPos ) {
 
 			tokens.push_back(str.substr(lastPos, pos-lastPos));
-			lastPos = str.find_first_not_of(delimiters, pos);
-			pos = str.find_first_of(delimiters, lastPos);
+			lastPos = str.find_first_not_of(this->delimiters, pos);
+			pos = str.find_first_of(this->delimiters, lastPos);
 		}
 	}
 	else
-		TokenizarCasosEspeciales(str, tokens);
+		this->TokenizarCasosEspeciales(str, tokens);
 }
 
 bool Tokenizador::Tokenizar (const string& input, const string& output) const
@@ -784,16 +1927,16 @@ bool Tokenizador::TokenizarDirectorio (const string& i) const
 }
 
 // S
-void Tokenizador::DelimitadoresPalabra(const string& nuevoDelimiters) { this->delimiters = nuevoDelimiters; }
+void Tokenizador::DelimitadoresPalabra(const string& nuevodelimitadores) { this->delimiters = procesar_delimitadores(nuevodelimitadores); }
 
-void Tokenizador::AnyadirDelimitadoresPalabra(const string& nuevoDelimiters)
+void Tokenizador::AnyadirDelimitadoresPalabra(const string& nuevodelimitadores)
 {
-	this->delimiters += nuevoDelimiters;
+	this->delimiters += nuevodelimitadores;
 	// controlar repeticiones!!
 }
 
 // G
-string Tokenizador::DelimitadoresPalabra() const { return delimiters; } 
+string Tokenizador::DelimitadoresPalabra() const { return this->delimiters; } 
 
 // S 
 void Tokenizador::CasosEspeciales (const bool& nuevoCasosEspeciales) { this->casosEspeciales = nuevoCasosEspeciales; }
