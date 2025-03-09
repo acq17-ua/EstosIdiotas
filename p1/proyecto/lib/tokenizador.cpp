@@ -8,6 +8,8 @@
 #include <cstring> 			// clear array with memset
 #include <string> 			// find_first_not_of
 
+const int PAGE_SIZE = sysconf(_SC_PAGE_SIZE);
+
 enum casosEspeciales {
 						U,
 						UDEAM,
@@ -20,11 +22,9 @@ enum casosEspeciales {
 						X
 };
 
-enum casosEspeciales trueEstado = UDEAM;
-
 // . , - @ son muy condicionantes
 // quiero ahorrarme ifs
-// Esto indica cuales son delimitadores
+// Esto indica cuales son this->delimitadores
 enum delimitadoresEspeciales {
 								O,  		// U 	   	  	Y	
 								P,        	// UA 			Y
@@ -44,9 +44,9 @@ enum delimitadoresEspeciales {
 								PCGA 		// UDEAM 		Y
 };
 
-bool delimitadores[256] = {0};
+//bool delimitadores[256] = {0};
 
-constexpr int conversion[256] = 	{
+constexpr unsigned char conversion[256] = 	{
 						  0,   1,   2,   3,   4,   5,   6,   7,   8,   9, 
 						 10,  11,  12,  13,  14,  15,  16,  17,  18,  19, 
 						 20,  21,  22,  23,  24,  25,  26,  27,  28,  29, 
@@ -82,7 +82,7 @@ constexpr int conversion[256] = 	{
 // multiw -> 	-
 
 // estados necesarios para expresar que caracteres son excepciones para cada caso especial
-// 0: no es excepciÔøΩn
+// 0: no es excepci?n
 // 1: exc para solo decimal
 // 2: exc para solo URL
 // 3: exc para solo URL e email
@@ -119,25 +119,34 @@ constexpr char exceptions[256] = 	{
 /////////
 // AUX //
 /////////
-string Tokenizador::procesar_delimitadores(string s) const
+string Tokenizador::procesar_delimitadores(string s) 
 {
 	int n = s.size();
     string delims = "";
  
-	for( auto& c : this->delimiters )
-		delimitadores[c] = 0;
+	for( unsigned char c : this->delimiters ) {
+		this->delimitadores[c] = 0;
+		this->delimitadores[c] = 0;
+	}
 
-	for (int i = 0; i < n; i++) {
-		
-		if( !delimitadores[s[i]] ) {
-			delimitadores[s[i]] = true;
-			delims += s[i];
+	for( unsigned char c : s ) 
+
+		if( !this->delimitadores[c] ) {
+			this->delimitadores[c] = true;
+			delims += c;
 		}
-	}
+	
 	if( this->casosEspeciales ) {
-		delimitadores[' '] = true; // space
-		delims += ' ';
+		this->delimitadores[(unsigned char)' '] = true;
+		delims += (unsigned char)' ';
+		//this->delimitadores[(unsigned char)'\0'] = true;
+		//delims += (unsigned char)0;
+		this->delimitadores[(unsigned char)'\n'] = true;
+		delims += (unsigned char)'\n';
+		//this->delimitadores[(unsigned char)'\t'] = true;
+		//delims += (unsigned char)'\t';
 	}
+
     return delims;
 }
 
@@ -155,10 +164,10 @@ ostream& operator<<(ostream& os, const Tokenizador& t)
 
 Tokenizador::Tokenizador ()
 {
-	this->delimiters = ",;:.-/+*\\ '\"{}[]()<>ÔøΩ!ÔøΩ?&#=\t@";
+	this->delimiters = ",;:.-/+*\\ '\"{}[]()<>°!ø?&#=\t@";
 
-	for( auto c : this->delimiters )
-		delimitadores[c] = true;
+	for( unsigned char c : this->delimiters )
+		this->delimitadores[c] = true;
 
 	this->casosEspeciales = true;
 	this->pasarAminuscSinAcentos = false;
@@ -216,12 +225,13 @@ bool Tokenizador::Tokenizar_ftp( const string& str, list<string>& tokens, int& i
 	else
 		return false;
 
-	if( delimitadores[str[i]] & !exceptions[str[i]]>=2 ) {  // http: and thats it
+		/*
+	if( this->delimitadores[str[i]] & !exceptions[str[i]]>=2 ) {  // http: and thats it
 		i = token_start;
 		return false;
-	}
+	} */
 
-	if( (delimitadores[str[i]] & !exceptions[str[i]]>=2) || i==str.size() ) {  // http: and thats it
+	if( (this->delimitadores[str[i]] & !exceptions[str[i]]>=2) || i==str.size() ) {  // http: and thats it
 		curr_token.resize(curr_token.size()-1);
 		i--;
 		return false;
@@ -237,7 +247,7 @@ bool Tokenizador::Tokenizar_ftp( const string& str, list<string>& tokens, int& i
 			c = str[i];
 
 
-		if( delimitadores[c] & !exceptions[c]>=2 ) { 
+		if( this->delimitadores[c] & !exceptions[c]>=2 ) { 
 			
 			tokens.push_back(curr_token);
 			return true;
@@ -270,23 +280,23 @@ bool Tokenizador::Tokenizar_http( const string& str, list<string>& tokens, int& 
 
 	//cout << "in url is " << curr_token << endl;
 
-	if( (delimitadores[str[i]] & !exceptions[str[i]]>=2) || i==str.size() ) {  // http: and thats it
+	if( (this->delimitadores[str[i]] & !exceptions[str[i]]>=2) || i==str.size() ) {  // http: and thats it
 		curr_token.resize(curr_token.size()-1);
 		i--;
 		return false;
 	}  
 
-	char c;
+	unsigned char c;
 
 	for( ; i<str.size(); i++ ) {
 		
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else
 			c = str[i];
 
 
-		if( delimitadores[c] & !exceptions[c]>=2 ) { 
+		if( this->delimitadores[c] & !exceptions[c]>=2 ) { 
 			
 			tokens.push_back(curr_token);
 			return true;
@@ -303,36 +313,32 @@ bool Tokenizador::Tokenizar_http( const string& str, list<string>& tokens, int& 
 
 bool Tokenizador::Tokenizar_decimal( const string& str, list<string>& tokens, int& i, string& curr_token, bool heading_zero ) const {
 
-	char c;
+	unsigned char c;
 	bool just_dot=false;
 	int token_start=i;
 
 	if( heading_zero ) {
-		//cout << "heading zero "<< heading_zero << endl;
-		// remove heading .,
+
 		for( ; i<str.size(); i++ ) {
 
-			c = str[i];
-			//cout << i << " " << c << endl;
+			c = (unsigned char)str[i];
 			switch( c ) {
 
 				case ',':
 				case '.':
-					//cout << "puntito o coma " << curr_token << endl;
 					break;
 
 				case '0': case '1': case '2': case '3': case '4':
 				case '5': case '6': case '7': case '8': case '9':
 					curr_token = "0";
-					curr_token += str[i-1];
+					curr_token += (unsigned char)str[i-1];
 					curr_token += c;
 					i++;
-					//cout << "placing myself at " << i  << " currtoken is (" << curr_token << ") " << str[i] << endl;
 					goto decimal_correct;
 
 				default:
 
-					if( delimitadores[c] ) {   // ...,.,.,- 
+					if( this->delimitadores[(unsigned char)c] ) {   // ...,.,.,- 
 						i++;
 						return false;
 					}
@@ -349,12 +355,12 @@ bool Tokenizador::Tokenizar_decimal( const string& str, list<string>& tokens, in
 	// 123.123,123.123,123.123,123.a  <== el caso con el que tuve pesadillas anoche
 	// TODO esperar a los tests
 	
-	// Leer resto del n√∫mero
-	/// TODO Si te encuentras una coma intermedia, hay que guardar su posici√≥n para cortar ah√≠ en caso de que el decimal falle
+	// Leer resto del n˙mero
+	/// TODO Si te encuentras una coma intermedia, hay que guardar su posiciÛn para cortar ahÌ en caso de que el decimal falle
 	for( ; i<str.size(); i++ ) {
 
 		//cout << "iteration " << i << " (" << str[i] << ")" << endl;
-		c = str[i];
+		c = (unsigned char)str[i];
 		switch(c) {
 
 			case ',':  // TODO
@@ -377,7 +383,7 @@ bool Tokenizador::Tokenizar_decimal( const string& str, list<string>& tokens, in
 			default:
 				//cout << "encountered " << c << endl;
 
-				if( delimitadores[c] ) {  // 123,23- √≥ 123,23& Delimit right here
+				if( this->delimitadores[c] ) {  // 123,23- Û 123,23& Delimit right here
 					
 					if( just_dot ) { // 123.&
 
@@ -427,14 +433,14 @@ bool Tokenizador::Tokenizar_email_O( const string& str, list<string>& tokens, in
 	
 	int at_position;
 	int token_start = i;
-	char c;
+	unsigned char c;
 
 	for( ; i<str.size(); i++ ) {
 	
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else
-			c = str[i];
+			c = (unsigned char)str[i];
 
 		switch( c ) {
 
@@ -444,7 +450,7 @@ bool Tokenizador::Tokenizar_email_O( const string& str, list<string>& tokens, in
 				goto after_at;
 
 			default:
-				if( delimitadores[c] ) {  // not email. Over right here.
+				if( this->delimitadores[c] ) {  // not email. Over right here.
 
 					tokens.push_back(curr_token);
 					i++;
@@ -461,7 +467,7 @@ bool Tokenizador::Tokenizar_email_O( const string& str, list<string>& tokens, in
 
 	after_at:
 
-	if( delimitadores[str[i]] ) {   // sdasda@{.-_@ or other delimiter} Not an email anymore, delimited at previous @
+	if( this->delimitadores[(unsigned char)str[i]] ) {   // sdasda@{.-_@ or other delimiter} Not an email anymore, delimited at previous @
 
 		tokens.push_back(string(curr_token, 0, curr_token.size()-1));
 		i++;
@@ -473,11 +479,11 @@ bool Tokenizador::Tokenizar_email_O( const string& str, list<string>& tokens, in
 	// read rest of email
 	for( ; i<str.size(); i++ ) {
 
-		c = str[i];
+		c = (unsigned char)str[i];
 		switch( c ) {
 
 			case '_':
-				if( !delimitadores[c] ) {
+				if( !this->delimitadores[c] ) {
 					curr_token += c;
 					just_dot = false;
 				}
@@ -489,18 +495,18 @@ bool Tokenizador::Tokenizar_email_O( const string& str, list<string>& tokens, in
 				else { 		// sda@a__ | sad@a_a_a__a  gets delimited at ..
 
 					tokens.push_back(string(curr_token, 0, curr_token.size()-1));
-					i++; // get placed after delimitadores
+					i++; // get placed after this->delimitadores
 					return true;
 				}
 				break;
 			
 			case '@':   // bro is NOT an email. Cortamos el token en el @ y del resto se encarga otro
 				tokens.push_back(string(curr_token, 0, at_position));
-				i = token_start + at_position + 1; // ponernos justo despu√©s del @
+				i = token_start + at_position + 1; // ponernos justo despuÈs del @
 				return true;
 
 			default:
-				if( !delimitadores[c] ) {  	// content
+				if( !this->delimitadores[c] ) {  	// content
 					curr_token += c;
 					just_dot = false;
 				}
@@ -532,7 +538,7 @@ bool Tokenizador::Tokenizar_email_A( const string& str, list<string>& tokens, in
 	
 	int at_position;
 	int token_start = i;
-	char c;
+	unsigned char c;
 
 	i = str.find_first_not_of(this->delimiters, i);
 	if( i==str.npos ) return false;
@@ -540,15 +546,15 @@ bool Tokenizador::Tokenizar_email_A( const string& str, list<string>& tokens, in
 	for( ; i<str.size(); i++ ) {
 	
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else
-			c = str[i];
+			c = (unsigned char)str[i];
 
 		//printf("email %c\n", c);
 
 		switch( c ) {
 
-			case '.':  // no era un email, a√∫n podr√≠a ser un acr√≥nimo.  Acronimo tendr√° que comprobar si curr_token est√° vac√≠o o no.
+			case '.':  // no era un email, a˙n podrÌa ser un acrÛnimo.  Acronimo tendr· que comprobar si curr_token est· vacÌo o no.
 				curr_token.append(1, c);
 				//cout << "boutta return " << curr_token << endl;
 				canBeAcronym = true;
@@ -562,7 +568,7 @@ bool Tokenizador::Tokenizar_email_A( const string& str, list<string>& tokens, in
 				goto after_at;
 
 			default:
-				if( delimitadores[c] ) {  // not email. Over right here.
+				if( this->delimitadores[c] ) {  // not email. Over right here.
 
 					tokens.push_back(curr_token);
 					i++;
@@ -581,7 +587,7 @@ bool Tokenizador::Tokenizar_email_A( const string& str, list<string>& tokens, in
 
 	//cout << "curr token is " << curr_token << " after at --" << i << " -- " << str[i]  << endl;
 
-	if( delimitadores[str[i]] ) {   // sdasda@{.-_@ or other delimiter} Not an email anymore, delimited at previous @
+	if( this->delimitadores[str[i]] ) {   // sdasda@{.-_@ or other delimiter} Not an email anymore, delimited at previous @
 
 		tokens.push_back(string(curr_token, 0, curr_token.size()-1));
 		i++;
@@ -609,7 +615,7 @@ bool Tokenizador::Tokenizar_email_A( const string& str, list<string>& tokens, in
 				}
 				break;
 			case '_':
-				if( !delimitadores[c] )  {
+				if( !this->delimitadores[c] )  {
 					curr_token += c;
 					just_dot = false;
 				}
@@ -621,7 +627,7 @@ bool Tokenizador::Tokenizar_email_A( const string& str, list<string>& tokens, in
 				else { 		// sda@a__ | sad@a_a_a__a  gets delimited at ..
 
 					tokens.push_back(string(curr_token, 0, curr_token.size()-1));
-					i++; // get placed after delimitadores
+					i++; // get placed after this->delimitadores
 					return true;
 				}
 				break;
@@ -629,11 +635,11 @@ bool Tokenizador::Tokenizar_email_A( const string& str, list<string>& tokens, in
 			case '@':   // bro is NOT an email. Cortamos el token en el @ y del resto se encarga otro
 				//cout << "found second @ at " << i << " cutting token short at at_position " << at_position << endl;
 				tokens.push_back(string(curr_token, 0, at_position));
-				i = token_start + at_position + 1; // ponernos justo despu√©s del @
+				i = token_start + at_position + 1; // ponernos justo despuÈs del @
 				return true;
 
 			default:
-				if( !delimitadores[c] )  { 	// content
+				if( !this->delimitadores[c] )  { 	// content
 					curr_token += c;
 					just_dot = false;
 				}
@@ -665,18 +671,18 @@ bool Tokenizador::Tokenizar_email_M( const string& str, list<string>& tokens, in
 	
 	int at_position;
 	int token_start = i;
-	char c;
+	unsigned char c;
 
 	for( ; i<str.size(); i++ ) {
 	
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else
 			c = str[i];
 
 		switch( c ) {
 
-			case '-':  // no era un email, a√∫n podr√≠a ser un multiword.  Multiword tendr√° que comprobar si curr_token est√° vac√≠o o no.
+			case '-':  // no era un email, a˙n podrÌa ser un multiword.  Multiword tendr· que comprobar si curr_token est· vacÌo o no.
 				curr_token += c;
 				canBeMultiword = true;
 				return false;
@@ -687,7 +693,7 @@ bool Tokenizador::Tokenizar_email_M( const string& str, list<string>& tokens, in
 				goto after_at;
 
 			default:
-				if( delimitadores[c] ) {  // not email. Over right here.
+				if( this->delimitadores[c] ) {  // not email. Over right here.
 
 					tokens.push_back(curr_token);
 					i++;
@@ -704,7 +710,7 @@ bool Tokenizador::Tokenizar_email_M( const string& str, list<string>& tokens, in
 
 	after_at:
 
-	if( delimitadores[str[i]] ) {   // sdasda@{.-_@ or other delimiter} Not an email anymore, delimited at previous @
+	if( this->delimitadores[(unsigned char)str[i]] ) {   // sdasda@{.-_@ or other delimiter} Not an email anymore, delimited at previous @
 
 		tokens.push_back(string(curr_token, 0, curr_token.size()-1));
 		i++;
@@ -716,7 +722,7 @@ bool Tokenizador::Tokenizar_email_M( const string& str, list<string>& tokens, in
 	// read rest of email
 	for( ; i<str.size(); i++ ) {
 
-		c = str[i];
+		c = (unsigned char)str[i];
 		switch( c ) {
 
 			case '-':
@@ -732,7 +738,7 @@ bool Tokenizador::Tokenizar_email_M( const string& str, list<string>& tokens, in
 				}
 				break;
 			case '_':
-				if( !delimitadores[c] ) {
+				if( !this->delimitadores[c] ) {
 					curr_token += c;
 					just_dot = false;
 				}
@@ -744,18 +750,18 @@ bool Tokenizador::Tokenizar_email_M( const string& str, list<string>& tokens, in
 				else { 		// sda@a__ | sad@a_a_a__a  gets delimited at ..
 
 					tokens.push_back(string(curr_token, 0, curr_token.size()-1));
-					i++; // get placed after delimitadores
+					i++; // get placed after this->delimitadores
 					return true;
 				}
 				break;
 			
 			case '@':   // bro is NOT an email. Cortamos el token en el @ y del resto se encarga otro
 				tokens.push_back(string(curr_token, 0, at_position));
-				i = token_start + at_position + 1; // ponernos justo despu√©s del @
+				i = token_start + at_position + 1; // ponernos justo despuÈs del @
 				return true;
 
 			default:
-				if( !delimitadores[c] ) {  	// content
+				if( !this->delimitadores[c] ) {  	// content
 					curr_token += c;
 					just_dot = false;
 				}
@@ -789,7 +795,7 @@ bool Tokenizador::Tokenizar_email_AM( const string& str, list<string>& tokens, i
 	
 	int at_position;
 	int token_start = i;
-	char c;
+	unsigned char c;
 
 	i = str.find_first_not_of(this->delimiters,i);
 	if( i==str.npos ) return false;
@@ -797,18 +803,17 @@ bool Tokenizador::Tokenizar_email_AM( const string& str, list<string>& tokens, i
 	for( ; i<str.size(); i++ ) {
 	
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else
-			c = str[i];
+			c = (unsigned char)str[i];
 
-		c = str[i];
 		switch( c ) {
 
-			case '.': 	// no era un email, a√∫n podr√≠a ser un acronimo.  Acronimo tendr√° que comprobar si curr_token est√° vac√≠o o no.
+			case '.': 	// no era un email, a˙n podrÌa ser un acronimo.  Acronimo tendr· que comprobar si curr_token est· vacÌo o no.
 				curr_token += c;
 				canBeAcronym = true;
 				return false;
-			case '-':  	// no era un email, a√∫n podr√≠a ser un multiword.  Multiword tendr√° que comprobar si curr_token est√° vac√≠o o no.
+			case '-':  	// no era un email, a˙n podrÌa ser un multiword.  Multiword tendr· que comprobar si curr_token est· vacÌo o no.
 				curr_token += c;
 				canBeMultiword = true;
 				return false;
@@ -819,7 +824,7 @@ bool Tokenizador::Tokenizar_email_AM( const string& str, list<string>& tokens, i
 				goto after_at;
 
 			default:
-				if( delimitadores[c] ) {  // not email. Over right here.
+				if( this->delimitadores[c] ) {  // not email. Over right here.
 
 					tokens.push_back(curr_token);
 					i++;
@@ -836,7 +841,7 @@ bool Tokenizador::Tokenizar_email_AM( const string& str, list<string>& tokens, i
 
 	after_at:
 
-	if( delimitadores[str[i]] ) {   // sdasda@{.-_@ or other delimiter} Not an email anymore, delimited at previous @
+	if( this->delimitadores[str[i]] ) {   // sdasda@{.-_@ or other delimiter} Not an email anymore, delimited at previous @
 
 		tokens.push_back(string(curr_token, 0, curr_token.size()-1));
 		i++;
@@ -848,7 +853,7 @@ bool Tokenizador::Tokenizar_email_AM( const string& str, list<string>& tokens, i
 	// read rest of email
 	for( ; i<str.size(); i++ ) {
 
-		c = str[i];
+		c = (unsigned char)str[i];
 		switch( c ) {
 
 			case '.':
@@ -865,7 +870,7 @@ bool Tokenizador::Tokenizar_email_AM( const string& str, list<string>& tokens, i
 				}
 				break;
 			case '_':
-				if( !delimitadores[c] ) {
+				if( !this->delimitadores[c] ) {
 					curr_token += c;
 					just_dot = false;
 				}
@@ -877,18 +882,18 @@ bool Tokenizador::Tokenizar_email_AM( const string& str, list<string>& tokens, i
 				else { 		// sda@a__ | sad@a_a_a__a  gets delimited at ..
 
 					tokens.push_back(string(curr_token, 0, curr_token.size()-1));
-					i++; // get placed after delimitadores
+					i++; // get placed after this->delimitadores
 					return true;
 				}
 				break;
 			
 			case '@':   // bro is NOT an email. Cortamos el token en el @ y del resto se encarga otro
 				tokens.push_back(string(curr_token, 0, at_position));
-				i = token_start + at_position + 1; // ponernos justo despu√©s del @
+				i = token_start + at_position + 1; // ponernos justo despuÈs del @
 				return true;
 
 			default:
-				if( !delimitadores[c] ) {  	// content
+				if( !this->delimitadores[c] ) {  	// content
 					curr_token += c;
 					just_dot = false;
 				}
@@ -923,7 +928,7 @@ bool Tokenizador::Tokenizar_acronimo( const string& str, list<string>& tokens, i
 	int token_start = i;
 	bool just_dot = false;
 
-	char c;
+	unsigned char c;
 	just_dot = !curr_token.empty();
 	i+=just_dot;
 	//cout << "dentro con i " << i << endl; 
@@ -935,9 +940,9 @@ bool Tokenizador::Tokenizar_acronimo( const string& str, list<string>& tokens, i
 		//cout << i << " " << str[i] << endl;
 		
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else
-			c = str[i];
+			c = (unsigned char)str[i];
 
 		switch( c ) {
 
@@ -956,11 +961,11 @@ bool Tokenizador::Tokenizar_acronimo( const string& str, list<string>& tokens, i
 				break;
 
 			case '-':   // not an acronym, could be multiword
-				if( delimitadores['-'] ) 
+				if( this->delimitadores[(unsigned char)'-'] ) 
 					return false;
 
 			default:
-				if( delimitadores[c] ) { 		
+				if( this->delimitadores[c] ) { 		
 					
 					//cout << "retrninggg" << endl;
 					if( just_dot ) {
@@ -989,7 +994,7 @@ bool Tokenizador::Tokenizar_acronimo( const string& str, list<string>& tokens, i
 bool Tokenizador::Tokenizar_multipalabra( const string& str, list<string>& tokens, int&i, string& curr_token ) const {
 
 	bool just_dash=false;
-	char c;
+	unsigned char c;
 	
 	just_dash = !curr_token.empty();
 	i += just_dash;
@@ -998,8 +1003,8 @@ bool Tokenizador::Tokenizar_multipalabra( const string& str, list<string>& token
 
 		for( ; i<str.size(); i++ ) {
 
-			if( str[i]!='-' ) {
-				if( delimitadores[str[i]] )     // ----& 
+			if( (unsigned char)str[i]!='-' ) {
+				if( this->delimitadores[(unsigned char)str[i]] )     // ----& 
 						return false;
 				else
 					break;
@@ -1009,13 +1014,13 @@ bool Tokenizador::Tokenizar_multipalabra( const string& str, list<string>& token
 	for( ; i<str.size(); i++ ) {
 
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else
-			c = str[i];
+			c = (unsigned char)str[i];
 
 		if( c!='-' ) {
 
-			if( delimitadores[c] ) {
+			if( this->delimitadores[c] ) {
 				tokens.push_back(curr_token);
 				return true;
 			}
@@ -1031,7 +1036,7 @@ bool Tokenizador::Tokenizar_multipalabra( const string& str, list<string>& token
 			}
 			else {
 				just_dash = true;
-				curr_token += '-';
+				curr_token += (unsigned char)'-';
 			}
 		}
 	}
@@ -1044,17 +1049,17 @@ void Tokenizador::Tokenizar_token_normal( const string& str, list<string>& token
 	
 	//printf("entrando a token normal\n");
 
-	char c;
+	unsigned char c;
 
 	for( ; i<str.size(); i++ ) {
 
 
 		if( this->pasarAminuscSinAcentos )
-		c = conversion[str[i]];
+		c = conversion[(unsigned char)str[i]];
 		else
-		c = str[i];
+		c = (unsigned char)str[i];
 
-		if( delimitadores[c] ) {
+		if( this->delimitadores[c] ) {
 			tokens.push_back(curr_token);
 			i++;
 			return;
@@ -1067,7 +1072,7 @@ void Tokenizador::Tokenizar_token_normal( const string& str, list<string>& token
 	return;
 }
 
-// army of methods para ahorrarme ifs. Despues de la _ indica cuales son delimitadores
+// army of methods para ahorrarme ifs. Despues de la _ indica cuales son this->delimitadores
 void Tokenizador::TokenizarCasosEspeciales_U( const string& str, list<string>& tokens ) const {
 
 	// URL 			Y
@@ -1077,7 +1082,7 @@ void Tokenizador::TokenizarCasosEspeciales_U( const string& str, list<string>& t
 	// Multiw 		N
 
 	int i=0;
-	char c;
+	unsigned char c;
 	string curr_token;
 
 	//printf("tokenizando casos especiales U\n");
@@ -1087,9 +1092,9 @@ void Tokenizador::TokenizarCasosEspeciales_U( const string& str, list<string>& t
 		curr_token.clear();
 		
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else
-			c = str[i];
+			c = (unsigned char)str[i];
 
 		switch(c) {
 
@@ -1105,7 +1110,7 @@ void Tokenizador::TokenizarCasosEspeciales_U( const string& str, list<string>& t
 					goto token;
 				
 			default:
-				if( delimitadores[c] ) {  // es un delimitador indiscutible
+				if( this->delimitadores[c] ) {  // es un delimitador indiscutible
 					i++;
 					continue;
 				}
@@ -1126,13 +1131,17 @@ void Tokenizador::TokenizarCasosEspeciales_UA( const string& str, list<string>& 
 	//cout << "estado correcto" << endl;	
 
 	int i=0;
-	char c;
+	unsigned char c;
 	string curr_token;
 	
 	while( i<str.size() ) {
 
 		curr_token.clear();
-		c = str[i];
+		
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[(unsigned char)str[i]];
+		else
+			c = (unsigned char)str[i];
 
 		switch(c) {
 
@@ -1149,7 +1158,7 @@ void Tokenizador::TokenizarCasosEspeciales_UA( const string& str, list<string>& 
 			
 			default:
 
-				if( delimitadores[c] ) {  // es un delimitador indiscutible
+				if( this->delimitadores[c] ) {  // es un delimitador indiscutible
 					i++;
 					continue;
 				}
@@ -1174,16 +1183,16 @@ void Tokenizador::TokenizarCasosEspeciales_UE( const string& str, list<string>& 
 	// Multiw 		N
 
 	int i=0;
-	char c;
+	unsigned char c;
 	string curr_token;
 
 	while( i<str.size() ) {
 
 		curr_token.clear();
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else 
-			c = str[i];
+			c = (unsigned char)str[i];
 		
 		switch(c) {
 
@@ -1204,7 +1213,7 @@ void Tokenizador::TokenizarCasosEspeciales_UE( const string& str, list<string>& 
 
 			default:
 			
-				if( delimitadores[c]  ) {  // es un delimitador indiscutible
+				if( this->delimitadores[c]  ) {  // es un delimitador indiscutible
 					i++;
 					continue;
 				}
@@ -1228,7 +1237,7 @@ void Tokenizador::TokenizarCasosEspeciales_UME( const string& str, list<string>&
 	// Multiw 		N
 
 	int i=0;
-	char c;
+	unsigned char c;
 	string curr_token;
 	bool canBeMultiw;
 
@@ -1238,9 +1247,9 @@ void Tokenizador::TokenizarCasosEspeciales_UME( const string& str, list<string>&
 		curr_token.clear();
 
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else 
-			c = str[i];
+			c = (unsigned char)str[i];
 
 		switch(c) {
 
@@ -1261,7 +1270,7 @@ void Tokenizador::TokenizarCasosEspeciales_UME( const string& str, list<string>&
 
 			default:
 
-				if( delimitadores[c] ) {  // es un delimitador indiscutible
+				if( this->delimitadores[c] ) {  // es un delimitador indiscutible
 					i++;
 					continue;
 				}
@@ -1288,7 +1297,7 @@ void Tokenizador::TokenizarCasosEspeciales_UDA( const string& str, list<string>&
 	// Multiw 		N
 
 	int i=0;
-	char c;
+	unsigned char c;
 	string curr_token;
 	bool canBeAcronym, heading_dot;
 	
@@ -1298,9 +1307,9 @@ void Tokenizador::TokenizarCasosEspeciales_UDA( const string& str, list<string>&
 		curr_token.clear();
 
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else 
-			c = str[i];
+			c = (unsigned char)str[i];
 		
 		switch(c) {
 
@@ -1322,12 +1331,12 @@ void Tokenizador::TokenizarCasosEspeciales_UDA( const string& str, list<string>&
 			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
 			case '5': case '6': case '7': case '8': case '9': 
 				
-				if( Tokenizar_decimal( str, tokens, i, curr_token, heading_dot ) ) // quitar√° la coma inicial si falla
+				if( Tokenizar_decimal( str, tokens, i, curr_token, heading_dot ) ) // quitar· la coma inicial si falla
 					continue;
 				
 			default:
 			
-				if( delimitadores[c] ) {  // es un delimitador indiscutible
+				if( this->delimitadores[c] ) {  // es un delimitador indiscutible
 					i++;
 					continue;
 				}
@@ -1349,7 +1358,7 @@ void Tokenizador::TokenizarCasosEspeciales_UMA( const string& str, list<string>&
 	// Multiw 		N
 
 	int i=0;
-	char c;
+	unsigned char c;
 	string curr_token;
 	
 	while( i<str.size() ) {
@@ -1357,9 +1366,9 @@ void Tokenizador::TokenizarCasosEspeciales_UMA( const string& str, list<string>&
 		curr_token.clear();
 		
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else 
-			c = str[i];
+			c = (unsigned char)str[i];
 
 		switch(c) {
 
@@ -1376,7 +1385,7 @@ void Tokenizador::TokenizarCasosEspeciales_UMA( const string& str, list<string>&
 			
 			default:
 
-				if( delimitadores[c] ) {  // es un delimitador indiscutible
+				if( this->delimitadores[c] ) {  // es un delimitador indiscutible
 					i++;
 					continue;
 				}
@@ -1406,7 +1415,7 @@ void Tokenizador::TokenizarCasosEspeciales_UAE( const string& str, list<string>&
 	//cout << "entrando en UAE" << endl;
 
 	int i=0;
-	char c;
+	unsigned char c;
 	string curr_token;
 	bool canBeAcronym;
 
@@ -1416,9 +1425,9 @@ void Tokenizador::TokenizarCasosEspeciales_UAE( const string& str, list<string>&
 		canBeAcronym = false;
 
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else 
-			c = str[i];
+			c = (unsigned char)str[i];
 
 		switch(c) {
 
@@ -1440,7 +1449,7 @@ void Tokenizador::TokenizarCasosEspeciales_UAE( const string& str, list<string>&
 			default:
 				//printf("intentando default\n");
 
-				if( delimitadores[c] ) {  // es un delimitador de los normales
+				if( this->delimitadores[c] ) {  // es un delimitador de los normales
 					i++;
 					continue;
 				}
@@ -1475,7 +1484,7 @@ void Tokenizador::TokenizarCasosEspeciales_UDAE( const string& str, list<string>
 	// Multiw 		N
 
 	int i=0;
-	char c;
+	unsigned char c;
 	string curr_token;
 	bool canBeAcronym, heading_dot;
 	
@@ -1485,9 +1494,9 @@ void Tokenizador::TokenizarCasosEspeciales_UDAE( const string& str, list<string>
 		canBeAcronym = true, heading_dot = false;
 
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else 
-			c = str[i];
+			c = (unsigned char)str[i];
 		
 		//cout << "vamos por " << c << endl;	
 
@@ -1516,15 +1525,15 @@ void Tokenizador::TokenizarCasosEspeciales_UDAE( const string& str, list<string>
 			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
 			case '5': case '6': case '7': case '8': case '9': 
 				
-				if( Tokenizar_decimal( str, tokens, i, curr_token, heading_dot ) ) { // quitar√° la coma inicial si falla
+				if( Tokenizar_decimal( str, tokens, i, curr_token, heading_dot ) ) { // quitar· la coma inicial si falla
 					//cout << "pushed element " << tokens.back() << endl;
 					continue;
 				}
 				
 			default:
 			
-				//cout << "es otra cosa " << delimitadores[c] << " - " << (int)exceptions[c] << endl;
-				if( delimitadores[c] ) {  // es un delimitador indiscutible
+				//cout << "es otra cosa " << this->delimitadores[c] << " - " << (int)exceptions[c] << endl;
+				if( this->delimitadores[c] ) {  // es un delimitador indiscutible
 					i++;
 					//cout << "delimitador saltado" << endl;
 					continue;
@@ -1552,16 +1561,16 @@ void Tokenizador::TokenizarCasosEspeciales_UM( const string& str, list<string>& 
 	// Multiw 		Y
 
 	int i=0;
-	char c;
+	unsigned char c;
 	string curr_token;
 
 	while( i<str.size() ) {
 
 		curr_token.clear();
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else 
-			c = str[i];
+			c = (unsigned char)str[i];
 		
 		switch(c) {
 
@@ -1577,7 +1586,7 @@ void Tokenizador::TokenizarCasosEspeciales_UM( const string& str, list<string>& 
 					goto token;
 				
 			default:
-				if( delimitadores[c] ) {  // es un delimitador indiscutible
+				if( this->delimitadores[c] ) {  // es un delimitador indiscutible
 					i++;
 					continue;
 				}
@@ -1601,7 +1610,7 @@ void Tokenizador::TokenizarCasosEspeciales_UDAM( const string& str, list<string>
 	// Multiw 		N
 
 	int i=0;
-	char c;
+	unsigned char c;
 	string curr_token;
 	bool heading_dot;
 	
@@ -1611,9 +1620,9 @@ void Tokenizador::TokenizarCasosEspeciales_UDAM( const string& str, list<string>
 		heading_dot = false;
 
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else 
-			c = str[i];
+			c = (unsigned char)str[i];
 		
 		switch(c) {
 
@@ -1635,12 +1644,12 @@ void Tokenizador::TokenizarCasosEspeciales_UDAM( const string& str, list<string>
 			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
 			case '5': case '6': case '7': case '8': case '9': 
 				
-				if( Tokenizar_decimal( str, tokens, i, curr_token, heading_dot ) ) // quitar√° la coma inicial si falla
+				if( Tokenizar_decimal( str, tokens, i, curr_token, heading_dot ) ) // quitar· la coma inicial si falla
 					continue;
 				
 			default:
 			
-				if( delimitadores[c] ) {  // es un delimitador indiscutible
+				if( this->delimitadores[c] ) {  // es un delimitador indiscutible
 					i++;
 					continue;
 				}
@@ -1667,7 +1676,7 @@ void Tokenizador::TokenizarCasosEspeciales_UMAE( const string& str, list<string>
 	// Multiw 		N
 
 	int i=0;
-	char c;
+	unsigned char c;
 	string curr_token;
 	bool canBeAcronym, canBeMultiword;
 
@@ -1676,9 +1685,9 @@ void Tokenizador::TokenizarCasosEspeciales_UMAE( const string& str, list<string>
 		canBeAcronym = canBeMultiword = false;
 		curr_token.clear();
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else 
-			c = str[i];
+			c = (unsigned char)str[i];
 		switch(c) {
 
 			case 'h':
@@ -1697,7 +1706,7 @@ void Tokenizador::TokenizarCasosEspeciales_UMAE( const string& str, list<string>
 				continue;
 
 			default:
-				if( delimitadores[c] ) {  // es un delimitador de los normales
+				if( this->delimitadores[c] ) {  // es un delimitador de los normales
 					i++;
 					continue;
 				}
@@ -1737,9 +1746,9 @@ void Tokenizador::TokenizarCasosEspeciales_UDEAM( const string& str, list<string
 		canBeAcronym = canBeMultiword = heading_dot = false;
 
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+			c = conversion[(unsigned char)str[i]];
 		else 
-			c = str[i];
+			c = (unsigned char)str[i];
 		
 		switch(c) {
 
@@ -1764,12 +1773,12 @@ void Tokenizador::TokenizarCasosEspeciales_UDEAM( const string& str, list<string
 			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
 			case '5': case '6': case '7': case '8': case '9': 
 				
-				if( Tokenizar_decimal( str, tokens, i, curr_token, heading_dot ) ) // quitar√° la coma inicial si falla
+				if( Tokenizar_decimal( str, tokens, i, curr_token, heading_dot ) ) // quitar· la coma inicial si falla
 					continue;
 				
 			default:
 			
-				if( delimitadores[c] ) {  // es un delimitador indiscutible
+				if( this->delimitadores[c] ) {  // es un delimitador indiscutible
 					i++;
 					continue;
 				}
@@ -1792,68 +1801,68 @@ void Tokenizador::TokenizarCasosEspeciales_UDEAM( const string& str, list<string
 
 void Tokenizador::TokenizarCasosEspeciales( const string& str, list<string>& tokens ) const
 {
-	// segun los delimitadores mas condicionantes,
+	// segun los this->delimitadores mas condicionantes,
 	// manda a una funcion u otra.
 	// para ahorrar ifs dentro de bucles.
 
-	//printf("%d %d %d %d\n", delimitadores['.'], delimitadores[','], delimitadores['-'], delimitadores['@']);
+	//printf("%d %d %d %d\n", this->delimitadores['.'], this->delimitadores[','], this->delimitadores['-'], this->delimitadores['@']);
 
-	if( delimitadores['.'] ) {
+	if( this->delimitadores['.'] ) {
 
-		if( delimitadores[','] ) {
+		if( this->delimitadores[','] ) {
 
-			if( delimitadores['-'] ) {
+			if( this->delimitadores['-'] ) {
 
-				if( delimitadores['@'] )  	this->TokenizarCasosEspeciales_UDEAM(str, tokens);
+				if( this->delimitadores['@'] )  	this->TokenizarCasosEspeciales_UDEAM(str, tokens);
 					
 				else 						this->TokenizarCasosEspeciales_UDAM(str, tokens);
 			}
 			else {
-				if( delimitadores['@'] )  	this->TokenizarCasosEspeciales_UDAE(str, tokens);
+				if( this->delimitadores['@'] )  	this->TokenizarCasosEspeciales_UDAE(str, tokens);
 					
 				else 						this->TokenizarCasosEspeciales_UDA(str, tokens);
 			}
 
 		}
 		else {
-			if( delimitadores['-'] ) {
+			if( this->delimitadores['-'] ) {
 
-				if( delimitadores['@'] )  	this->TokenizarCasosEspeciales_UMAE(str, tokens);
+				if( this->delimitadores['@'] )  	this->TokenizarCasosEspeciales_UMAE(str, tokens);
 					
 				else 						this->TokenizarCasosEspeciales_UMA(str, tokens);
 			}
 			else {
-				if( delimitadores['@'] )  	this->TokenizarCasosEspeciales_UAE(str, tokens);
+				if( this->delimitadores['@'] )  	this->TokenizarCasosEspeciales_UAE(str, tokens);
 					
 				else 						this->TokenizarCasosEspeciales_UA(str, tokens);
 			}
 		}
 	}
 	else {
-		if( delimitadores[','] ) {
+		if( this->delimitadores[','] ) {
 
-			if( delimitadores['-'] ) {
+			if( this->delimitadores['-'] ) {
 
-				if( delimitadores['@'] )  	this->TokenizarCasosEspeciales_UME(str, tokens);
+				if( this->delimitadores['@'] )  	this->TokenizarCasosEspeciales_UME(str, tokens);
 					
 				else 						this->TokenizarCasosEspeciales_UM(str, tokens);
 			}
 			else {
-				if( delimitadores['@'] )  	this->TokenizarCasosEspeciales_UE(str, tokens);
+				if( this->delimitadores['@'] )  	this->TokenizarCasosEspeciales_UE(str, tokens);
 					
 				else 						this->TokenizarCasosEspeciales_U(str, tokens);
 			}
 
 		}
 		else {
-			if( delimitadores['-'] ) {
+			if( this->delimitadores['-'] ) {
 
-				if( delimitadores['@'] )  	this->TokenizarCasosEspeciales_UME(str, tokens);
+				if( this->delimitadores['@'] )  	this->TokenizarCasosEspeciales_UME(str, tokens);
 					
 				else 						this->TokenizarCasosEspeciales_UM(str, tokens);
 			}
 			else {
-				if( delimitadores['@'] )  	this->TokenizarCasosEspeciales_UE(str, tokens);
+				if( this->delimitadores['@'] )  	this->TokenizarCasosEspeciales_UE(str, tokens);
 					
 				else 						this->TokenizarCasosEspeciales_U(str, tokens);
 			}
@@ -1873,12 +1882,12 @@ void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
 
 			for( int i=0; i<str.size(); i++ ) {
 
-				if( delimitadores[str[i]] ) { // parar aqui
+				if( this->delimitadores[(unsigned char)str[i]] ) { // parar aqui
 					tokens.push_back(curr_token);
 					curr_token.clear();
 				}
 				else
-					curr_token += str[i];
+					curr_token += (unsigned char)str[i];
 			}
 			if( !curr_token.empty() )
 				tokens.push_back(curr_token);
@@ -1890,12 +1899,12 @@ void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
 
 			for( int i=0; i<str.size(); i++ ) {
 
-				if( delimitadores[str[i]] ) { // parar aqui
+				if( this->delimitadores[(unsigned char)str[i]] ) { // parar aqui
 					tokens.push_back(curr_token);
 					curr_token.clear();
 				}
 				else
-					curr_token += conversion[str[i]];
+					curr_token += conversion[(unsigned char)str[i]];
 
 			}
 			if( !curr_token.empty() )
@@ -1909,69 +1918,86 @@ void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
 bool Tokenizador::Tokenizar (const string& input, const string& output) const
 {
 	struct stat fileInfo;
-	char* map;
-	int fd, i=0;
+	unsigned char* map_input;
+	unsigned char* map_output;
+	int fd_input, fd_output, i=0;
 	list<string> tokens;
-	size_t fileSize;
+	size_t fileSize_input;
 
 	//////////
 	// READ //
 
-	fd = open(input.c_str(), O_RDONLY);
+	fd_input = open(input.c_str(), O_RDONLY);
 
-	if( lstat(input.c_str(), &fileInfo) == 0 ) {
+	if( stat(input.c_str(), &fileInfo) == 0 ) {
 		
-		if(fd == -1) {
+		if(fd_input == -1) {
 			cerr << "Failed to read file\n";
 			return false;
 		}
 		
-		fileSize = fileInfo.st_size;
-		map = (char*)mmap(0, fileSize, PROT_READ, MAP_SHARED, fd, 0);
+		fileSize_input = fileInfo.st_size;
+		map_input = reinterpret_cast<unsigned char*>(mmap(0, fileSize_input, PROT_READ, MAP_SHARED, fd_input, 0));
 		
-		if( map == 	MAP_FAILED ) {
+		if( map_input == MAP_FAILED ) {
 			cerr << "Failed to read file\n";
 			return false;
 		}
-		// get just one line
-		for( i=0; i<fileInfo.st_size && map[i]!='\n'; i++); 
-		
-		fileSize = i * sizeof(char); // cuz it only reads one line but there may be more
 
-		this->Tokenizar(string(map, map+i), tokens);
+		//cout << string((char*)map_input, fileSize_input) << endl;
+		this->Tokenizar(string((char*)map_input, fileSize_input), tokens);
+		//cout << "\n\n\n\n\n";
+		//print_list(tokens);
+		
 	}
 	else return false;
+
 
 	///////////
 	// WRITE //
 
-	fd = open(output.c_str(), O_RDWR | O_CREAT | O_TRUNC, (mode_t)0600);
-
+	fd_output = open(output.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+	
 	// set file size (will fail catastrophically if you remove this)
-	ftruncate(fd, fileSize);
-
-	if( lstat(output.c_str(), &fileInfo) == 0 ) {
+	
+	if( stat(output.c_str(), &fileInfo) == 0 ) {
 		
-		if(fd == -1) {
-			cerr << "Failed to write into .tk file\n";
+		if(fd_output == -1) {
+			cerr << "!Failed to write into .tk file\n";
 			return false;
 		}
-		map = (char*)mmap(0, fileSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+		unsigned int memory_needed = PAGE_SIZE*(fileSize_input/PAGE_SIZE + ((fileSize_input%PAGE_SIZE)>0)); 
 		
-		if( map == 	MAP_FAILED ) {
-			cerr << "Failed to write into .tk file\n";
+		posix_fallocate(fd_output, 0, memory_needed);
+		
+		map_output = reinterpret_cast<unsigned char*>(mmap(0, fileSize_input, PROT_WRITE, MAP_SHARED, fd_output, 0));
+
+		if( map_output == MAP_FAILED ) {
+			cerr << "!!Failed to write into .tk file\n";
 			return false;
 		}
-
+		
 		// copy tokens list into file
+		int j = 0;
 		for( auto const& it : tokens ) {
-
-			for( i=0; i<it.size(); i++ )
-				map[i] = it[i];
-
-			map[i] = '\n';
-
+			
+			//cout << "----- copiando token " << it << " en archivo" << endl;
+			for( i=0; i<it.size(); i++ ) {
+				//cout << "i " << i << endl;
+				map_output[j++] = it[i];
+			}
+			
+			map_output[j++] = '\n';
+			
 		}
+		
+		munmap(map_input, fileSize_input);
+		close(fd_input);
+		msync(map_output, fileSize_input, MS_ASYNC);
+		munmap(map_output, fileSize_input);
+		ftruncate(fd_output, j);
+		close(fd_output);
+
 		return true;
 	}
 	else return false;
@@ -1980,7 +2006,7 @@ bool Tokenizador::Tokenizar (const string& input, const string& output) const
 bool Tokenizador::Tokenizar (const string & input) const 
 {
 	struct stat fileInfo;
-	char* map;
+	unsigned char* map;
 	int fd, i=0;
 	list<string> tokens;
 	const string output = input+".tk";
@@ -1991,7 +2017,7 @@ bool Tokenizador::Tokenizar (const string & input) const
 
 	fd = open(input.c_str(), O_RDONLY);
 
-	if( lstat(input.c_str(), &fileInfo) == 0 ) {
+	if( stat(input.c_str(), &fileInfo) == 0 ) {
 		
 		if(fd == -1) {
 			cerr << "Failed to read file\n";
@@ -1999,18 +2025,18 @@ bool Tokenizador::Tokenizar (const string & input) const
 		}
 		
 		fileSize = fileInfo.st_size;
-		map = (char*)mmap(0, fileSize, PROT_READ, MAP_SHARED, fd, 0);
+		map = (unsigned char*)mmap(0, fileSize, PROT_READ, MAP_SHARED, fd, 0);
 		
 		if( map == 	MAP_FAILED ) {
 			cerr << "Failed to read file\n";
 			return false;
 		}
 		// get just one line
-		for( i=0; i<fileInfo.st_size && map[i]!='\n'; i++); 
+		//for( i=0; i<fileInfo.st_size && map[i]!='\n'; i++); 
 		
-		fileSize = i * sizeof(char); // cuz it only reads one line but there may be more
+		//fileSize = i * sizeof(unsigned char); // cuz it only reads one line but there may be more
 
-		this->Tokenizar(string(map, map+i), tokens);
+		this->Tokenizar(string((char*)map, fileSize), tokens);
 	}
 	else return false;
 
@@ -2022,13 +2048,13 @@ bool Tokenizador::Tokenizar (const string & input) const
 	// set file size (will fail catastrophically if you remove this)
 	ftruncate(fd, fileSize);
 
-	if( lstat(output.c_str(), &fileInfo) == 0 ) {
+	if( stat(output.c_str(), &fileInfo) == 0 ) {
 		
 		if(fd == -1) {
 			cerr << "Failed to write into .tk file\n";
 			return false;
 		}
-		map = (char*)mmap(0, fileSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+		map = (unsigned char*)mmap(0, fileSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 		
 		if( map == 	MAP_FAILED ) {
 			cerr << "Failed to write into .tk file\n";
@@ -2053,47 +2079,68 @@ bool Tokenizador::Tokenizar (const string & input) const
 bool Tokenizador::TokenizarListaFicheros (const string& input) const 
 {
 	string file;
-	struct stat fileInfo;
+	struct stat fileInfo, fileInfoChild;
 	int fd;
-	char* map;
+	unsigned char* map;
 	int prev_it = 0;
 
 	fd = open(input.c_str(), O_RDONLY);
 	
-	if( lstat(input.c_str(), &fileInfo) == 0 ) {
+	if( stat(input.c_str(), &fileInfo) == 0 ) {
 		
 		if(fd == -1) {
 			cerr << "Failed to read file\n";
 			return false;
 		}
-		map = (char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
+		map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
 		
+		int line_counter = 0;
+		
+		/*
+		for( int i=0; i<fileInfo.st_size; i++ ) {
+			cout << map[i] << " " << i << endl;
+			if( map[i]=='\n' ) line_counter++;
+		}
+		//cout << "lines found: " << line_counter << endl;
+		//cout << fileInfo.st_size << endl;
+		*/
 		if( map == 	MAP_FAILED ) {
 			cerr << "Failed to read file\n";
 			return false;
 		}
-
 		// we're in the clear
-		for (int it = 0; it <=fileInfo.st_size; ++it) {
+		int counter = 0, it=0;
+		for ( it = 0; it<fileInfo.st_size; it++ ) {
 
-			if( map[it] == '\n' ) {
-				
-				file = string(map+prev_it, map+it);
-				prev_it = it+1;
+			//cout << it << "--\n";
+			if( map[it]=='\n' ) 
+			{
+				//cout << "(" << counter++ << ") currfile is " << file << endl;
+				if( stat(file.c_str(), &fileInfoChild) == 0 ) {
 
-				if( lstat(file.c_str(), &fileInfo) == 0 ) {
-
-					if( S_ISDIR(fileInfo.st_mode) ) 
+					if( S_ISDIR(fileInfoChild.st_mode) ) 
 						this->TokenizarDirectorio(file);
-					else 
+					else {
 						this->Tokenizar(file, file+".tk");
+					}
+					file.clear();
 				}
-				else 
+				else {
+					cout << "terminando abrurpptamente por algoo" << endl;
 					return false;
+				}
 			}
-		}	
+			else {
+				file += map[it];
+			}
+		}
+
+
+		//cout << "terminando NO abrurpptamente por algo " << it << " " << fileInfo.st_size << endl;
+
 		return true;
 	}
+	//cout << "terminando abrurpptamente por algo" << endl;
 	return false;
 } 
 
@@ -2101,7 +2148,7 @@ bool Tokenizador::TokenizarDirectorio (const string& i) const
 {
 	system(("find " + i + " ! -type d ! -name '*.tk' > ./tokenizar_directorio_res.txt").c_str());
 	bool result = TokenizarListaFicheros("tokenizar_directorio_res.txt");
-	system("rm ./tokenizar_directorio_res.txt");
+	//system("rm ./tokenizar_directorio_res.txt");
 	return result;
 }
 
@@ -2110,20 +2157,12 @@ void Tokenizador::DelimitadoresPalabra(const string& nuevodelimitadores) { this-
 
 void Tokenizador::AnyadirDelimitadoresPalabra(const string& nuevodelimitadores)
 {
-	this->delimiters += nuevodelimitadores;
-	
-	for( auto& c : nuevodelimitadores ) {
+	for( unsigned char c : nuevodelimitadores )
 
-		for( auto& d : this->delimiters ) 
-			if( c == d ) goto cont;
-		
-		this->delimiters += c;
-		cont:
-		continue;
-	}
-
-	for( auto c : nuevodelimitadores ) 
-		delimitadores[c] = true;
+		if( !this->delimitadores[c] ) {
+			this->delimiters += c;
+			this->delimitadores[c] = true;
+		}
 }
 
 // G
@@ -2132,7 +2171,7 @@ string Tokenizador::DelimitadoresPalabra() const { return this->delimiters; }
 // S 
 void Tokenizador::CasosEspeciales (const bool& nuevoCasosEspeciales) { 
 	this->casosEspeciales = nuevoCasosEspeciales; 
-	delimitadores[' '] = nuevoCasosEspeciales;
+	this->delimitadores[' '] = nuevoCasosEspeciales;
 }
 
 // G
