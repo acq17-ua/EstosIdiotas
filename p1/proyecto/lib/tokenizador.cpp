@@ -2682,22 +2682,20 @@ void Tokenizador::TokenizarCasosEspeciales_U( const unsigned char* input, const 
 			case 'h':
 				if (Tokenizar_http(input, input_size, tokens, i, curr_token))
 					continue;
-				else
-					goto token;
+				break;
+			
 			case 'f':
 				if (Tokenizar_ftp(input, input_size, tokens, i, curr_token))
 					continue;
-				else
-					goto token;
+				break;
 				
 			default:
 				if( this->delimitadores[c] ) {  // es un delimitador indiscutible
 					i++;
 					continue;
 				}
-				token:
-				Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 		}
+		Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 	}
 }
 
@@ -2708,8 +2706,6 @@ void Tokenizador::TokenizarCasosEspeciales_UA( const unsigned char* input, const
 	// Email 		N
 	// Acronimo 	Y 		
 	// Multiw 		N
-
-	//cout << "estado correcto" << endl;	
 
 	int i=0;
 	unsigned char c;
@@ -2730,12 +2726,13 @@ void Tokenizador::TokenizarCasosEspeciales_UA( const unsigned char* input, const
 				if (Tokenizar_http(input, input_size, tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
+
 			case 'f':
 				if (Tokenizar_ftp(input, input_size, tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
 			
 			default:
 
@@ -2743,15 +2740,12 @@ void Tokenizador::TokenizarCasosEspeciales_UA( const unsigned char* input, const
 					i++;
 					continue;
 				}
-				
-				token:
-
-				if( Tokenizar_acronimo(input, input_size, tokens, i, curr_token) )
-					continue;
-
-				Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
-				//continue;
 		}
+
+		if( Tokenizar_acronimo(input, input_size, tokens, i, curr_token) )
+			continue;
+
+		Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 	}
 }
 
@@ -2781,12 +2775,13 @@ void Tokenizador::TokenizarCasosEspeciales_UE( const unsigned char* input, const
 				if (Tokenizar_http(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
+
 			case 'f':
 				if (Tokenizar_ftp(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
 			
 			case '@':
 				i++;
@@ -2798,14 +2793,11 @@ void Tokenizador::TokenizarCasosEspeciales_UE( const unsigned char* input, const
 					i++;
 					continue;
 				}
-				
-				token:
-
-				if( Tokenizar_email_O(input, input_size, tokens, i, curr_token) )
-					continue;
-
-				Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 		}
+		if( Tokenizar_email_O(input, input_size, tokens, i, curr_token) )
+			continue;
+
+		Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 	}
 }
 
@@ -2838,12 +2830,13 @@ void Tokenizador::TokenizarCasosEspeciales_UME( const unsigned char* input, cons
 				if (Tokenizar_http(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
+
 			case 'f':
 				if (Tokenizar_ftp(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
 
 			case '@':
 				i++;
@@ -2856,16 +2849,14 @@ void Tokenizador::TokenizarCasosEspeciales_UME( const unsigned char* input, cons
 					continue;
 				}
 
-				token:
-
-				if( Tokenizar_email_M(input, input_size, tokens, i, curr_token, canBeMultiw) ) // te lo ha empezado 100%, si hay un guion entonces se comprueba multiw
-					continue;
-
-				if( canBeMultiw && Tokenizar_multipalabra(input, input_size, tokens, i, curr_token) )
-					continue;
-
-				Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 		}
+		if( Tokenizar_email_M(input, input_size, tokens, i, curr_token, canBeMultiw) ) // te lo ha empezado 100%, si hay un guion entonces se comprueba multiw
+			continue;
+
+		if( canBeMultiw && Tokenizar_multipalabra(input, input_size, tokens, i, curr_token) )
+			continue;
+
+		Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 	}
 }
 
@@ -2899,14 +2890,14 @@ void Tokenizador::TokenizarCasosEspeciales_UDA( const unsigned char* input, cons
 				if (Tokenizar_http(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
 			
 			case 'f':
 				heading_dot = 0;
 				if (Tokenizar_ftp(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
 			
 			case ',':
 			case '.':
@@ -2926,12 +2917,11 @@ void Tokenizador::TokenizarCasosEspeciales_UDA( const unsigned char* input, cons
 					i++;
 					continue;
 				}
-				token:
-				if( Tokenizar_acronimo(input, input_size, tokens, i, curr_token) ) 
-					continue;
-
-				Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 		}
+		if( Tokenizar_acronimo(input, input_size, tokens, i, curr_token) ) 
+			continue;
+
+		Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 	}
 }
 
@@ -2962,12 +2952,13 @@ void Tokenizador::TokenizarCasosEspeciales_UMA( const unsigned char* input, cons
 				if (Tokenizar_http(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
+
 			case 'f':
 				if (Tokenizar_ftp(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
 			
 			default:
 
@@ -2976,17 +2967,14 @@ void Tokenizador::TokenizarCasosEspeciales_UMA( const unsigned char* input, cons
 					continue;
 				}
 
-				token:
-
-				if( Tokenizar_acronimo(input, input_size, tokens, i, curr_token) )
-					continue;
-
-				if( Tokenizar_multipalabra(input, input_size, tokens, i, curr_token) )
-					continue;
-
-				Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
-				//continue;
 		}
+		if( Tokenizar_acronimo(input, input_size, tokens, i, curr_token) )
+			continue;
+
+		if( Tokenizar_multipalabra(input, input_size, tokens, i, curr_token) )
+			continue;
+
+		Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 	}
 }
 
@@ -2997,8 +2985,6 @@ void Tokenizador::TokenizarCasosEspeciales_UAE( const unsigned char* input, cons
 	// Email 		Y
 	// Acronimo 	Y 		
 	// Multiw 		N
-
-	//cout << "entrando en UAE" << endl;
 
 	int i=0;
 	unsigned char c;
@@ -3021,43 +3007,31 @@ void Tokenizador::TokenizarCasosEspeciales_UAE( const unsigned char* input, cons
 				if (Tokenizar_http(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
 			case 'f':
 				if (Tokenizar_ftp(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
 			
 			case '@':
 				i++;
 				continue;
 
 			default:
-				//printf("intentando default\n");
 
 				if( this->delimitadores[c] ) {  // es un delimitador de los normales
 					i++;
 					continue;
 				}
-				//printf("intentando email %d\n", i);
-
-				token:
-
-				if( Tokenizar_email_A(input, input_size, tokens, i, curr_token, canBeAcronym) )
-					continue;
-					//printf("intentando acronimo (%d), (%s)\n", canBeAcronym, curr_token);
-				
-				//cout << "intentando acronimo (" << curr_token << ")" << endl;
-
-				if ( canBeAcronym && Tokenizar_acronimo(input, input_size, tokens, i, curr_token) ) {
-					//cout << "i al salir: " << i << endl;
-					continue;
-				}
-					
-				//printf("intentando normal\n");
-
-				Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 		}
+		if( Tokenizar_email_A(input, input_size, tokens, i, curr_token, canBeAcronym) )
+			continue;
+
+		if ( canBeAcronym && Tokenizar_acronimo(input, input_size, tokens, i, curr_token) )
+			continue;
+
+		Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 	}
 }
 
@@ -3094,14 +3068,14 @@ void Tokenizador::TokenizarCasosEspeciales_UDAE( const unsigned char* input, con
 				if (Tokenizar_http(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
 			
 			case 'f':
 				heading_dot = 0;
 				if (Tokenizar_ftp(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
 			
 			case '@':
 				i++;
@@ -3117,30 +3091,24 @@ void Tokenizador::TokenizarCasosEspeciales_UDAE( const unsigned char* input, con
 			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
 			case '5': case '6': case '7': case '8': case '9': 
 				
-				if( Tokenizar_decimal( input, input_size, tokens, i, curr_token, heading_dot ) ) { // quitará la coma inicial si falla
-					//cout << "pushed element " << tokens.back() << endl;
+				if( Tokenizar_decimal( input, input_size, tokens, i, curr_token, heading_dot ) ) // quitará la coma inicial si falla
 					continue;
-				}
 				
 			default:
 				heading_dot = 0;
-				//cout << "es otra cosa " << this->delimitadores[c] << " - " << (int)exceptions[c] << endl;
 				if( this->delimitadores[c] ) {  // es un delimitador indiscutible
 					i++;
-					//cout << "delimitador saltado" << endl;
 					continue;
 				}
-				
-				token:
-				
-				if( Tokenizar_email_A(input, input_size, tokens, i, curr_token, canBeAcronym) )
-					continue;
-
-				if( canBeAcronym && Tokenizar_acronimo(input, input_size, tokens, i, curr_token) ) 
-					continue;
-
-				Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 		}
+		
+		if( Tokenizar_email_A(input, input_size, tokens, i, curr_token, canBeAcronym) )
+			continue;
+
+		if( canBeAcronym && Tokenizar_acronimo(input, input_size, tokens, i, curr_token) ) 
+			continue;
+
+		Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 	}
 }
 
@@ -3151,8 +3119,6 @@ void Tokenizador::TokenizarCasosEspeciales_UM( const unsigned char* input, const
 	// Email 		N
 	// Acronimo 	N		
 	// Multiw 		Y
-
-	//cout << "is space a delimiter: " << this->delimitadores[' '] << endl;
 
 	int i=0;
 	unsigned char c;
@@ -3172,26 +3138,25 @@ void Tokenizador::TokenizarCasosEspeciales_UM( const unsigned char* input, const
 				if (Tokenizar_http(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
+
 			case 'f':
 				if (Tokenizar_ftp(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
 				
 			default:
 				if( this->delimitadores[c] ) {  // es un delimitador indiscutible
 					i++;
 					continue;
 				}
-
-				token:
-
-				if( Tokenizar_multipalabra(input, input_size, tokens, i, curr_token) )
-					continue;
-
-				Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 		}
+
+		if( Tokenizar_multipalabra(input, input_size, tokens, i, curr_token) )
+			continue;
+
+		Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 	}
 }
 
@@ -3224,13 +3189,14 @@ void Tokenizador::TokenizarCasosEspeciales_UDAM( const unsigned char* input, con
 				if (Tokenizar_http(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
+
 			case 'f':
 				heading_dot = 0;
 				if (Tokenizar_ftp(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
 			
 			case ',':
 			case '.':
@@ -3249,17 +3215,15 @@ void Tokenizador::TokenizarCasosEspeciales_UDAM( const unsigned char* input, con
 					i++;
 					continue;
 				}
-				
-				token:
-
-				if( Tokenizar_acronimo(input, input_size, tokens, i, curr_token) ) 
-					continue;
-
-				if( Tokenizar_multipalabra(input, input_size, tokens, i, curr_token) )
-					continue;
-
-				Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 		}
+
+		if( Tokenizar_acronimo(input, input_size, tokens, i, curr_token) ) 
+			continue;
+
+		if( Tokenizar_multipalabra(input, input_size, tokens, i, curr_token) )
+			continue;
+
+		Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 	}
 }
 
@@ -3290,12 +3254,13 @@ void Tokenizador::TokenizarCasosEspeciales_UMAE( const unsigned char* input, con
 				if (Tokenizar_http(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
+
 			case 'f':
 				if (Tokenizar_ftp(input, input_size,tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
 			
 			case '@':
 				i++;
@@ -3306,20 +3271,17 @@ void Tokenizador::TokenizarCasosEspeciales_UMAE( const unsigned char* input, con
 					i++;
 					continue;
 				}
+		}	
+		if( Tokenizar_email_AM(input, input_size, tokens, i, curr_token, canBeAcronym, canBeMultiword) )
+			continue;
+		
+		if ( canBeAcronym && Tokenizar_acronimo(input, input_size, tokens, i, curr_token))
+			continue;
 
-				token:
+		if ( canBeMultiword && Tokenizar_multipalabra(input, input_size, tokens, i, curr_token))
+			continue;
 
-				if( Tokenizar_email_AM(input, input_size, tokens, i, curr_token, canBeAcronym, canBeMultiword) )
-					continue;
-				
-				if ( canBeAcronym && Tokenizar_acronimo(input, input_size, tokens, i, curr_token))
-					continue;
-
-				if ( canBeMultiword && Tokenizar_multipalabra(input, input_size, tokens, i, curr_token))
-					continue;
-
-				Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
-		}
+		Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 	}
 
 }
@@ -3354,13 +3316,14 @@ void Tokenizador::TokenizarCasosEspeciales_UDEAM( const unsigned char* input, co
 				if (Tokenizar_http(input, input_size, tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
+
 			case 'f':
 				heading_dot = 0;
 				if (Tokenizar_ftp(input, input_size, tokens, i, curr_token))
 					continue;
 				else
-					goto token;
+					break;
 			
 			case '@':
 				heading_dot = 0;
@@ -3385,20 +3348,17 @@ void Tokenizador::TokenizarCasosEspeciales_UDEAM( const unsigned char* input, co
 					i++;
 					continue;
 				}
-
-				token:
-
-				if( Tokenizar_email_AM(input, input_size, tokens, i, curr_token, canBeAcronym, canBeMultiword) ) 
-					continue;
-
-				if( canBeAcronym && Tokenizar_acronimo(input, input_size, tokens, i, curr_token) ) 
-					continue;
-
-				if( canBeMultiword && Tokenizar_multipalabra(input, input_size, tokens, i, curr_token) )
-					continue;
-
-				Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 		}
+		if( Tokenizar_email_AM(input, input_size, tokens, i, curr_token, canBeAcronym, canBeMultiword) ) 
+			continue;
+
+		if( canBeAcronym && Tokenizar_acronimo(input, input_size, tokens, i, curr_token) ) 
+			continue;
+
+		if( canBeMultiword && Tokenizar_multipalabra(input, input_size, tokens, i, curr_token) )
+			continue;
+
+		Tokenizar_token_normal(input, input_size, tokens, i, curr_token);
 	}
 }
 
@@ -3488,28 +3448,44 @@ void Tokenizador::TokenizarCasosEspeciales( const unsigned char* input, const si
 
 			if( this->delimitadores['-'] ) {
 
-				if( this->delimitadores['@'] )  	this->TokenizarCasosEspeciales_UDEAM(input, input_size, tokens);
+				if( this->delimitadores['@'] ) {
 					
-				else 								this->TokenizarCasosEspeciales_UDAM(input, input_size, tokens);
+					this->TokenizarCasosEspeciales_UDEAM(input, input_size, tokens);
+				}
+				else {
+					this->TokenizarCasosEspeciales_UDAM(input, input_size, tokens);
+				}
 			}
 			else {
-				if( this->delimitadores['@'] )  	this->TokenizarCasosEspeciales_UDAE(input, input_size, tokens);
+				if( this->delimitadores['@'] ) {
 					
-				else 								this->TokenizarCasosEspeciales_UDA(input, input_size, tokens);
+					this->TokenizarCasosEspeciales_UDAE(input, input_size, tokens);
+				}
+				else {
+					this->TokenizarCasosEspeciales_UDA(input, input_size, tokens);
+				}
 			}
 
 		}
 		else {
 			if( this->delimitadores['-'] ) {
 
-				if( this->delimitadores['@'] )  	this->TokenizarCasosEspeciales_UMAE(input, input_size, tokens);
+				if( this->delimitadores['@'] ) {
 					
-				else 								this->TokenizarCasosEspeciales_UMA(input, input_size, tokens);
+					this->TokenizarCasosEspeciales_UMAE(input, input_size, tokens);
+				}
+				else {
+					this->TokenizarCasosEspeciales_UMA(input, input_size, tokens);
+				}
 			}
 			else {
-				if( this->delimitadores['@'] )  	this->TokenizarCasosEspeciales_UAE(input, input_size, tokens);
+				if( this->delimitadores['@'] ) {
 					
-				else 								this->TokenizarCasosEspeciales_UA(input, input_size, tokens);
+					this->TokenizarCasosEspeciales_UAE(input, input_size, tokens);
+				}
+				else {
+					this->TokenizarCasosEspeciales_UA(input, input_size, tokens);
+				}
 			}
 		}
 	}
@@ -3518,28 +3494,44 @@ void Tokenizador::TokenizarCasosEspeciales( const unsigned char* input, const si
 
 			if( this->delimitadores['-'] ) {
 
-				if( this->delimitadores['@'] )  	this->TokenizarCasosEspeciales_UME(input, input_size, tokens);
+				if( this->delimitadores['@'] ) {
 					
-				else 								this->TokenizarCasosEspeciales_UM(input, input_size, tokens);
+					this->TokenizarCasosEspeciales_UME(input, input_size, tokens);
+				}
+				else {
+					this->TokenizarCasosEspeciales_UM(input, input_size, tokens);
+				}
 			}
 			else {
-				if( this->delimitadores['@'] )  	this->TokenizarCasosEspeciales_UE(input, input_size, tokens);
+				if( this->delimitadores['@'] ) {
 					
-				else 								this->TokenizarCasosEspeciales_U(input, input_size, tokens);
+					this->TokenizarCasosEspeciales_UE(input, input_size, tokens);
+				}
+				else {
+					this->TokenizarCasosEspeciales_U(input, input_size, tokens);
+				}
 			}
 
 		}
 		else {
 			if( this->delimitadores['-'] ) {
 
-				if( this->delimitadores['@'] )  	this->TokenizarCasosEspeciales_UME(input, input_size, tokens);
+				if( this->delimitadores['@'] ) {
 					
-				else 								this->TokenizarCasosEspeciales_UM(input, input_size, tokens);
+					this->TokenizarCasosEspeciales_UME(input, input_size, tokens);
+				}
+				else {
+					this->TokenizarCasosEspeciales_UM(input, input_size, tokens);
+				}
 			}
 			else {
-				if( this->delimitadores['@'] )  	this->TokenizarCasosEspeciales_UE(input, input_size, tokens);
+				if( this->delimitadores['@'] ) {
 					
-				else 								this->TokenizarCasosEspeciales_U(input, input_size, tokens);
+					this->TokenizarCasosEspeciales_UE(input, input_size, tokens);
+				}
+				else {
+					this->TokenizarCasosEspeciales_U(input, input_size, tokens);
+				}
 			}
 		}
 	}
