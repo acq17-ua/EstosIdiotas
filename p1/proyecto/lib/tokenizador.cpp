@@ -322,44 +322,18 @@ bool Tokenizador::Tokenizar_http( const string& str, list<string>& tokens, int& 
 	return true;
 }
 
-bool Tokenizador::Tokenizar_decimal( const string& str, list<string>& tokens, int& i, string& curr_token, bool heading_zero ) const {
+bool Tokenizador::Tokenizar_decimal( const string& str, list<string>& tokens, int& i, string& curr_token, char heading_zero ) const {
 
 	unsigned char c;
 	bool just_dot=false;
 	int token_start=i;
 
-	if( heading_zero ) {
-
-		for( ; i<str.size(); i++ ) {
-
-			c = (unsigned char)str[i];
-			switch( c ) {
-
-				case ',':
-				case '.':
-					break;
-
-				case '0': case '1': case '2': case '3': case '4':
-				case '5': case '6': case '7': case '8': case '9':
-					curr_token = "0";
-					curr_token += (unsigned char)str[i-1];
-					curr_token += c;
-					i++;
-					goto decimal_correct;
-
-				default:
-
-					if( this->delimitadores[(unsigned char)c] ) {   // ...,.,.,- 
-						i++;
-						return false;
-					}
-					//cout << "returning false" << endl; 
-					return true; 			// ...,.,.a
-			}
-		}	
+	// hay heading .,
+	if( heading_zero )
+	{
+		curr_token = "0";
+		curr_token += heading_zero;
 	}
-	
-	decimal_correct:
 	
 	//cout << "decimal correcto: " << curr_token << endl;
 
@@ -1305,11 +1279,11 @@ void Tokenizador::TokenizarCasosEspeciales_UDA( const string& str, list<string>&
 	int i=0;
 	unsigned char c;
 	string curr_token;
-	bool canBeAcronym, heading_dot;
+	bool canBeAcronym;
+	char heading_dot;
 	
 	while( i<str.size() ) {
 		
-		heading_dot = false;
 		curr_token.clear();
 
 		if( this->pasarAminuscSinAcentos )
@@ -1320,20 +1294,25 @@ void Tokenizador::TokenizarCasosEspeciales_UDA( const string& str, list<string>&
 		switch(c) {
 
 			case 'h':
+				heading_dot = 0;
 				if (Tokenizar_http(str,tokens, i, curr_token))
 					continue;
 				else
 					goto token;
+			
 			case 'f':
+				heading_dot = 0;
 				if (Tokenizar_ftp(str,tokens, i, curr_token))
 					continue;
 				else
 					goto token;
 			
 			case ',':
-				//canBeAcronym=false;
 			case '.':
-				heading_dot = true;
+				heading_dot = c;
+				i++;
+				break;
+
 			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
 			case '5': case '6': case '7': case '8': case '9': 
 				
@@ -1341,7 +1320,7 @@ void Tokenizador::TokenizarCasosEspeciales_UDA( const string& str, list<string>&
 					continue;
 				
 			default:
-			
+				heading_dot = 0;
 				if( this->delimitadores[c] ) {  // es un delimitador indiscutible
 					i++;
 					continue;
@@ -1492,12 +1471,13 @@ void Tokenizador::TokenizarCasosEspeciales_UDAE( const string& str, list<string>
 	int i=0;
 	unsigned char c;
 	string curr_token;
-	bool canBeAcronym, heading_dot;
+	bool canBeAcronym;
+	char heading_dot;
 	
 	while( i<str.size() ) {
 		
 		curr_token.clear();
-		canBeAcronym = true, heading_dot = false;
+		canBeAcronym = true;
 
 		if( this->pasarAminuscSinAcentos )
 			c = conversion[(unsigned char)str[i]];
@@ -1509,11 +1489,14 @@ void Tokenizador::TokenizarCasosEspeciales_UDAE( const string& str, list<string>
 		switch(c) {
 
 			case 'h':
+				heading_dot = 0;
 				if (Tokenizar_http(str,tokens, i, curr_token))
 					continue;
 				else
 					goto token;
+			
 			case 'f':
+				heading_dot = 0;
 				if (Tokenizar_ftp(str,tokens, i, curr_token))
 					continue;
 				else
@@ -1521,13 +1504,15 @@ void Tokenizador::TokenizarCasosEspeciales_UDAE( const string& str, list<string>
 			
 			case '@':
 				i++;
+				heading_dot = 0;
 				continue;
 
 			case ',':
-				//canBeAcronym=false;
 			case '.':
-				heading_dot = true;
-				
+				heading_dot = c;
+				i++;
+				break;
+
 			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
 			case '5': case '6': case '7': case '8': case '9': 
 				
@@ -1537,7 +1522,7 @@ void Tokenizador::TokenizarCasosEspeciales_UDAE( const string& str, list<string>
 				}
 				
 			default:
-			
+				heading_dot = 0;
 				//cout << "es otra cosa " << this->delimitadores[c] << " - " << (int)exceptions[c] << endl;
 				if( this->delimitadores[c] ) {  // es un delimitador indiscutible
 					i++;
@@ -1620,12 +1605,11 @@ void Tokenizador::TokenizarCasosEspeciales_UDAM( const string& str, list<string>
 	int i=0;
 	unsigned char c;
 	string curr_token;
-	bool heading_dot;
+	char heading_dot;
 	
 	while( i<str.size() ) {
 		
 		curr_token.clear();
-		heading_dot = false;
 
 		if( this->pasarAminuscSinAcentos )
 			c = conversion[(unsigned char)str[i]];
@@ -1635,20 +1619,23 @@ void Tokenizador::TokenizarCasosEspeciales_UDAM( const string& str, list<string>
 		switch(c) {
 
 			case 'h':
+				heading_dot = 0;
 				if (Tokenizar_http(str,tokens, i, curr_token))
 					continue;
 				else
 					goto token;
 			case 'f':
+				heading_dot = 0;
 				if (Tokenizar_ftp(str,tokens, i, curr_token))
 					continue;
 				else
 					goto token;
 			
 			case ',':
-				//canBeAcronym=false;
 			case '.':
-				heading_dot = true;
+				heading_dot = c;
+				i++;
+				break;	
 			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
 			case '5': case '6': case '7': case '8': case '9': 
 				
@@ -1656,7 +1643,7 @@ void Tokenizador::TokenizarCasosEspeciales_UDAM( const string& str, list<string>
 					continue;
 				
 			default:
-			
+				heading_dot = 0;
 				if( this->delimitadores[c] ) {  // es un delimitador indiscutible
 					i++;
 					continue;
@@ -1747,11 +1734,12 @@ void Tokenizador::TokenizarCasosEspeciales_UDEAM( const string& str, list<string
 	int i=0;
 	char c;
 	string curr_token;
-	bool canBeAcronym, canBeMultiword, heading_dot;
+	bool canBeAcronym, canBeMultiword;
+	char heading_dot;
 	
 	while( i<str.size() ) {
 		
-		canBeAcronym = canBeMultiword = heading_dot = false;
+		canBeAcronym = canBeMultiword;
 
 		if( this->pasarAminuscSinAcentos )
 			c = conversion[(unsigned char)str[i]];
@@ -1761,23 +1749,29 @@ void Tokenizador::TokenizarCasosEspeciales_UDEAM( const string& str, list<string
 		switch(c) {
 
 			case 'h':
+				heading_dot = 0;
 				if (Tokenizar_http(str,tokens, i, curr_token))
 					continue;
 				else
 					goto token;
 			case 'f':
+				heading_dot = 0;
 				if (Tokenizar_ftp(str,tokens, i, curr_token))
 					continue;
 				else
 					goto token;
 			
 			case '@':
+				heading_dot = 0;
 				i++;
 				continue;
+
 			case ',':
-				//canBeAcronym=false;
 			case '.':
-				heading_dot = true;
+				i++;
+				heading_dot = c;
+				break;
+
 			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
 			case '5': case '6': case '7': case '8': case '9': 
 				
@@ -1785,7 +1779,7 @@ void Tokenizador::TokenizarCasosEspeciales_UDEAM( const string& str, list<string
 					continue;
 				
 			default:
-			
+				heading_dot = 0;
 				if( this->delimitadores[c] ) {  // es un delimitador indiscutible
 					i++;
 					continue;
