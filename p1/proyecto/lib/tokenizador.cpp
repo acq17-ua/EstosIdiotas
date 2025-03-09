@@ -134,7 +134,10 @@ string Tokenizador::procesar_delimitadores(string s) const
 			delims += s[i];
 		}
 	}
-	delimitadores[' '] = true; // space
+	if( this->casosEspeciales ) {
+		delimitadores[' '] = true; // space
+		delims += ' ';
+	}
     return delims;
 }
 
@@ -1713,14 +1716,40 @@ void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
 	tokens.clear();
 
 	if( !this->casosEspeciales ) {
-		string::size_type lastPos = str.find_first_not_of(this->delimiters, 0);
-		string::size_type pos = str.find_first_of(this->delimiters, lastPos);
+		
+		if( !this->pasarAminuscSinAcentos ) {
+		
+			string curr_token="";
 
-		while( string::npos != pos && string::npos != lastPos ) {
+			for( int i=0; i<str.size(); i++ ) {
 
-			tokens.push_back(str.substr(lastPos, pos-lastPos));
-			lastPos = str.find_first_not_of(this->delimiters, pos);
-			pos = str.find_first_of(this->delimiters, lastPos);
+				if( delimitadores[str[i]] ) { // parar aqui
+					tokens.push_back(curr_token);
+					curr_token.clear();
+				}
+				else
+					curr_token += str[i];
+			}
+			if( !curr_token.empty() )
+				tokens.push_back(curr_token);
+
+		}
+		else {
+
+			string curr_token="";
+
+			for( int i=0; i<str.size(); i++ ) {
+
+				if( delimitadores[str[i]] ) { // parar aqui
+					tokens.push_back(curr_token);
+					curr_token.clear();
+				}
+				else
+					curr_token += conversion[str[i]];
+
+			}
+			if( !curr_token.empty() )
+				tokens.push_back(curr_token);
 		}
 	}
 	else
@@ -1939,7 +1968,10 @@ void Tokenizador::AnyadirDelimitadoresPalabra(const string& nuevodelimitadores)
 string Tokenizador::DelimitadoresPalabra() const { return this->delimiters; } 
 
 // S 
-void Tokenizador::CasosEspeciales (const bool& nuevoCasosEspeciales) { this->casosEspeciales = nuevoCasosEspeciales; }
+void Tokenizador::CasosEspeciales (const bool& nuevoCasosEspeciales) { 
+	this->casosEspeciales = nuevoCasosEspeciales; 
+	delimitadores[' '] = nuevoCasosEspeciales;
+}
 
 // G
 bool Tokenizador::CasosEspeciales () { return casosEspeciales; }
