@@ -147,7 +147,7 @@ string Tokenizador::procesar_delimitadores(string s) const
 
 ostream& operator<<(ostream& os, const Tokenizador& t)
 {
-	os << " DELIMITADORES: " << t.delimiters 
+	os << "DELIMITADORES: " << t.delimiters 
 		<< " TRATA CASOS ESPECIALES: " << t.casosEspeciales 
 		<< " PASAR A MINUSCULAS Y SIN ACENTOS: " << t.pasarAminuscSinAcentos;
 	return os;
@@ -204,41 +204,30 @@ void print_list(list<string>& cadena) {
 
 }
 
-bool Tokenizador::Tokenizar_url( const string& str, list<string>& tokens, int& i, string& curr_token) const {
+bool Tokenizador::Tokenizar_ftp( const string& str, list<string>& tokens, int& i, string& curr_token ) const {
 
-	// Comprobar si es url
-	// http: o https:
-	//if( str[i]=='h' ) {
+	
+	int token_start = i;
+
+	if( (str.size()-i)>=4 && ((str[i+1]=='t') & (str[i+2]=='p' & str[i+3]==':')) ) { 		// ftp:
+		curr_token = "ftp:";
+		i += 4;
+	}
+	else
+		return false;
+
+	if( delimitadores[str[i]] & !exceptions[str[i]]>=2 ) {  // http: and thats it
+		i = token_start;
+		return false;
+	}
+
+	if( (delimitadores[str[i]] & !exceptions[str[i]]>=2) || i==str.size() ) {  // http: and thats it
+		curr_token.resize(curr_token.size()-1);
+		i--;
+		return false;
+	}  
 
 	char c;
-
-		if( (str.size()-i)>=5 && ((str[i+1]=='t') & (str[i+2]=='t') & (str[i+3]=='p')) ) {
-
-			if( str[i+4]==':' ) {   
-				curr_token = "http:";											// http:
-				i += 5;
-				goto read_url;
-			}
-			if( ( str.size()-i )>=6 && (str[i+4]=='s') & (str[i+5]==':') ) { 	// https:
-				curr_token = "https:";
-				i += 6;
-				goto read_url;
-			}
-		}
-		//return false;
-	//}
-	// ftp:
-	//if( str[i]=='f' ) {
-
-		if( (str.size()-i)>=4 && ((str[i+1]=='t') & (str[i+2]=='p')) ) { 		// ftp:
-			curr_token = "ftp:";
-			i += 4;
-			goto read_url;
-		}
-	//}
-	return false;
-
-	read_url:
 
 	for( ; i<str.size(); i++ ) {
 		
@@ -248,7 +237,8 @@ bool Tokenizador::Tokenizar_url( const string& str, list<string>& tokens, int& i
 			c = str[i];
 
 
-		if( delimitadores[c] & !exceptions[c]>=2 ) {  // "http:" y un url correcto se guardan igual
+		if( delimitadores[c] & !exceptions[c]>=2 ) { 
+			
 			tokens.push_back(curr_token);
 			return true;
 		}
@@ -257,7 +247,58 @@ bool Tokenizador::Tokenizar_url( const string& str, list<string>& tokens, int& i
 	}
 	// si has llegado aqui, estas al final del string
 	tokens.push_back(curr_token);
-	return true;	
+	return true;
+
+}
+
+bool Tokenizador::Tokenizar_http( const string& str, list<string>& tokens, int& i, string& curr_token ) const {
+
+	int token_start = i;
+
+	if( (str.size()-i)>=5 && ((str[i+1]=='t') & (str[i+2]=='t') & (str[i+3]=='p')) ) {
+
+		if( str[i+4]==':' ) {   
+			curr_token = "http:";												// http:
+			i += 5;
+		}
+		else if( ( str.size()-i )>=6 && (str[i+4]=='s') & (str[i+5]==':') ) { 	// https:
+			curr_token = "https:";
+			i += 6;
+		}
+	}
+	else return false;
+
+	//cout << "in url is " << curr_token << endl;
+
+	if( (delimitadores[str[i]] & !exceptions[str[i]]>=2) || i==str.size() ) {  // http: and thats it
+		curr_token.resize(curr_token.size()-1);
+		i--;
+		return false;
+	}  
+
+	char c;
+
+	for( ; i<str.size(); i++ ) {
+		
+		if( this->pasarAminuscSinAcentos )
+			c = conversion[str[i]];
+		else
+			c = str[i];
+
+
+		if( delimitadores[c] & !exceptions[c]>=2 ) { 
+			
+			tokens.push_back(curr_token);
+			return true;
+		}
+		else
+			curr_token += c;
+	}
+
+	// si has llegado aqui, estas al final del string
+	tokens.push_back(curr_token);
+	return true;
+
 }
 
 bool Tokenizador::Tokenizar_decimal( const string& str, list<string>& tokens, int& i, string& curr_token, bool heading_zero ) const {
@@ -267,22 +308,26 @@ bool Tokenizador::Tokenizar_decimal( const string& str, list<string>& tokens, in
 	int token_start=i;
 
 	if( heading_zero ) {
-
+		//cout << "heading zero "<< heading_zero << endl;
 		// remove heading .,
 		for( ; i<str.size(); i++ ) {
 
 			c = str[i];
+			//cout << i << " " << c << endl;
 			switch( c ) {
 
-				//case ',':
-				//	canBeAcronym = false;
+				case ',':
 				case '.':
+					//cout << "puntito o coma " << curr_token << endl;
 					break;
 
-				case 0: case 1: case 2: case 3: case 4:
-				case 5: case 6: case 7: case 8: case 9:
-					i--;
-					curr_token = "0" + c;
+				case '0': case '1': case '2': case '3': case '4':
+				case '5': case '6': case '7': case '8': case '9':
+					curr_token = "0";
+					curr_token += str[i-1];
+					curr_token += c;
+					i++;
+					//cout << "placing myself at " << i  << " currtoken is (" << curr_token << ") " << str[i] << endl;
 					goto decimal_correct;
 
 				default:
@@ -291,13 +336,16 @@ bool Tokenizador::Tokenizar_decimal( const string& str, list<string>& tokens, in
 						i++;
 						return false;
 					}
-					return false; 			// ...,.,.a
+					//cout << "returning false" << endl; 
+					return true; 			// ...,.,.a
 			}
 		}	
 	}
 	
 	decimal_correct:
 	
+	//cout << "decimal correcto: " << curr_token << endl;
+
 	// 123.123,123.123,123.123,123.a  <== el caso con el que tuve pesadillas anoche
 	// TODO esperar a los tests
 	
@@ -429,8 +477,10 @@ bool Tokenizador::Tokenizar_email_O( const string& str, list<string>& tokens, in
 		switch( c ) {
 
 			case '_':
-				if( !delimitadores[c] ) 
+				if( !delimitadores[c] ) {
 					curr_token += c;
+					just_dot = false;
+				}
 				
 				else if( !just_dot ) {
 					just_dot = true;
@@ -450,8 +500,10 @@ bool Tokenizador::Tokenizar_email_O( const string& str, list<string>& tokens, in
 				return true;
 
 			default:
-				if( !delimitadores[c] )   	// content
+				if( !delimitadores[c] ) {  	// content
 					curr_token += c;
+					just_dot = false;
+				}
 				
 				else { 					// terminar
 					if( !just_dot ) 
@@ -504,6 +556,8 @@ bool Tokenizador::Tokenizar_email_A( const string& str, list<string>& tokens, in
 
 			case '@':
 				at_position = i-token_start;  // relativo a curr_token
+				//cout << "found first @ at " << at_position << " relative to currtoken: " << curr_token << endl;
+				curr_token += '@';
 				i++;
 				goto after_at;
 
@@ -524,6 +578,8 @@ bool Tokenizador::Tokenizar_email_A( const string& str, list<string>& tokens, in
 	return true;
 
 	after_at:
+
+	//cout << "curr token is " << curr_token << " after at --" << i << " -- " << str[i]  << endl;
 
 	if( delimitadores[str[i]] ) {   // sdasda@{.-_@ or other delimiter} Not an email anymore, delimited at previous @
 
@@ -553,8 +609,10 @@ bool Tokenizador::Tokenizar_email_A( const string& str, list<string>& tokens, in
 				}
 				break;
 			case '_':
-				if( !delimitadores[c] ) 
+				if( !delimitadores[c] )  {
 					curr_token += c;
+					just_dot = false;
+				}
 				
 				else if( !just_dot ) {
 					just_dot = true;
@@ -569,13 +627,16 @@ bool Tokenizador::Tokenizar_email_A( const string& str, list<string>& tokens, in
 				break;
 			
 			case '@':   // bro is NOT an email. Cortamos el token en el @ y del resto se encarga otro
+				//cout << "found second @ at " << i << " cutting token short at at_position " << at_position << endl;
 				tokens.push_back(string(curr_token, 0, at_position));
 				i = token_start + at_position + 1; // ponernos justo después del @
 				return true;
 
 			default:
-				if( !delimitadores[c] )   	// content
+				if( !delimitadores[c] )  { 	// content
 					curr_token += c;
+					just_dot = false;
+				}
 				
 				else { 					// terminar
 					if( !just_dot ) 
@@ -671,8 +732,10 @@ bool Tokenizador::Tokenizar_email_M( const string& str, list<string>& tokens, in
 				}
 				break;
 			case '_':
-				if( !delimitadores[c] ) 
+				if( !delimitadores[c] ) {
 					curr_token += c;
+					just_dot = false;
+				}
 				
 				else if( !just_dot ) {
 					just_dot = true;
@@ -692,8 +755,10 @@ bool Tokenizador::Tokenizar_email_M( const string& str, list<string>& tokens, in
 				return true;
 
 			default:
-				if( !delimitadores[c] )   	// content
+				if( !delimitadores[c] ) {  	// content
 					curr_token += c;
+					just_dot = false;
+				}
 				
 				else { 					// terminar
 					
@@ -800,8 +865,10 @@ bool Tokenizador::Tokenizar_email_AM( const string& str, list<string>& tokens, i
 				}
 				break;
 			case '_':
-				if( !delimitadores[c] ) 
+				if( !delimitadores[c] ) {
 					curr_token += c;
+					just_dot = false;
+				}
 				
 				else if( !just_dot ) {
 					just_dot = true;
@@ -821,8 +888,10 @@ bool Tokenizador::Tokenizar_email_AM( const string& str, list<string>& tokens, i
 				return true;
 
 			default:
-				if( !delimitadores[c] )   	// content
+				if( !delimitadores[c] ) {  	// content
 					curr_token += c;
+					just_dot = false;
+				}
 				
 				else { 					// terminar
 					
@@ -979,10 +1048,11 @@ void Tokenizador::Tokenizar_token_normal( const string& str, list<string>& token
 
 	for( ; i<str.size(); i++ ) {
 
+
 		if( this->pasarAminuscSinAcentos )
-			c = conversion[str[i]];
+		c = conversion[str[i]];
 		else
-			c = str[i];
+		c = str[i];
 
 		if( delimitadores[c] ) {
 			tokens.push_back(curr_token);
@@ -1005,7 +1075,7 @@ void Tokenizador::TokenizarCasosEspeciales_U( const string& str, list<string>& t
 	// Email 		N
 	// Acronimo 	N 		
 	// Multiw 		N
-	
+
 	int i=0;
 	char c;
 	string curr_token;
@@ -1024,16 +1094,19 @@ void Tokenizador::TokenizarCasosEspeciales_U( const string& str, list<string>& t
 		switch(c) {
 
 			case 'h':
+				if (Tokenizar_http(str,tokens, i, curr_token))
+					continue;
+				else
+					goto token;
 			case 'f':
-				if (Tokenizar_url(str,tokens, i, curr_token))
+				if (Tokenizar_ftp(str,tokens, i, curr_token))
 					continue;
 				else
 					goto token;
 				
 			default:
-				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
-					i = str.find_first_not_of(this->delimiters,i);
-					if( i == str.npos ) return;
+				if( delimitadores[c] ) {  // es un delimitador indiscutible
+					i++;
 					continue;
 				}
 				token:
@@ -1050,33 +1123,40 @@ void Tokenizador::TokenizarCasosEspeciales_UA( const string& str, list<string>& 
 	// Acronimo 	Y 		
 	// Multiw 		N
 
+	//cout << "estado correcto" << endl;	
+
 	int i=0;
 	char c;
 	string curr_token;
-	bool canBeAcronym;
 	
 	while( i<str.size() ) {
 
-		canBeAcronym = false;
 		curr_token.clear();
 		c = str[i];
 
 		switch(c) {
 
 			case 'h':
-			case 'f':
-				if ( Tokenizar_url(str, tokens, i, curr_token) )  // http:,
+				if (Tokenizar_http(str,tokens, i, curr_token))
 					continue;
+				else
+					goto token;
+			case 'f':
+				if (Tokenizar_ftp(str,tokens, i, curr_token))
+					continue;
+				else
+					goto token;
 			
 			default:
 
-				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
-					i = str.find_first_not_of(this->delimiters,i);
-					if( i == str.npos ) return;
+				if( delimitadores[c] ) {  // es un delimitador indiscutible
+					i++;
 					continue;
 				}
+				
+				token:
 
-				if( canBeAcronym && Tokenizar_acronimo(str, tokens, i, curr_token) )
+				if( Tokenizar_acronimo(str, tokens, i, curr_token) )
 					continue;
 
 				Tokenizar_token_normal(str, tokens, i, curr_token);
@@ -1095,10 +1175,11 @@ void Tokenizador::TokenizarCasosEspeciales_UE( const string& str, list<string>& 
 
 	int i=0;
 	char c;
-	string curr_token="";
+	string curr_token;
 
 	while( i<str.size() ) {
 
+		curr_token.clear();
 		if( this->pasarAminuscSinAcentos )
 			c = conversion[str[i]];
 		else 
@@ -1107,19 +1188,29 @@ void Tokenizador::TokenizarCasosEspeciales_UE( const string& str, list<string>& 
 		switch(c) {
 
 			case 'h':
-			case 'f':
-				if (Tokenizar_url(str,tokens, i, curr_token))
+				if (Tokenizar_http(str,tokens, i, curr_token))
 					continue;
+				else
+					goto token;
+			case 'f':
+				if (Tokenizar_ftp(str,tokens, i, curr_token))
+					continue;
+				else
+					goto token;
+			
 			case '@':
 				i++;
 				continue;
 
 			default:
-				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
-					i = str.find_first_not_of(this->delimiters,i);
-					if( i == str.npos ) return;
+			
+				if( delimitadores[c]  ) {  // es un delimitador indiscutible
+					i++;
 					continue;
 				}
+				
+				token:
+
 				if( Tokenizar_email_O(str, tokens, i, curr_token) )
 					continue;
 
@@ -1154,20 +1245,29 @@ void Tokenizador::TokenizarCasosEspeciales_UME( const string& str, list<string>&
 		switch(c) {
 
 			case 'h':
-			case 'f':
-				if (Tokenizar_url(str,tokens, i, curr_token))
+				if (Tokenizar_http(str,tokens, i, curr_token))
 					continue;
+				else
+					goto token;
+			case 'f':
+				if (Tokenizar_ftp(str,tokens, i, curr_token))
+					continue;
+				else
+					goto token;
 
 			case '@':
 				i++;
 				continue;
 
 			default:
-				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
-					i = str.find_first_not_of(this->delimiters,i);
-					if( i == str.npos ) return;
+
+				if( delimitadores[c] ) {  // es un delimitador indiscutible
+					i++;
 					continue;
 				}
+
+				token:
+
 				if( Tokenizar_email_M(str, tokens, i, curr_token, canBeMultiw) ) // te lo ha empezado 100%, si hay un guion entonces se comprueba multiw
 					continue;
 
@@ -1205,11 +1305,15 @@ void Tokenizador::TokenizarCasosEspeciales_UDA( const string& str, list<string>&
 		switch(c) {
 
 			case 'h':
-			case 'f':
-				if (Tokenizar_url(str,tokens, i, curr_token))
+				if (Tokenizar_http(str,tokens, i, curr_token))
 					continue;
 				else
-					goto acronimo;
+					goto token;
+			case 'f':
+				if (Tokenizar_ftp(str,tokens, i, curr_token))
+					continue;
+				else
+					goto token;
 			
 			case ',':
 				//canBeAcronym=false;
@@ -1223,12 +1327,11 @@ void Tokenizador::TokenizarCasosEspeciales_UDA( const string& str, list<string>&
 				
 			default:
 			
-				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
-					i = str.find_first_not_of(this->delimiters,i);
-					if( i == str.npos ) return;
+				if( delimitadores[c] ) {  // es un delimitador indiscutible
+					i++;
 					continue;
 				}
-				acronimo:
+				token:
 				if( Tokenizar_acronimo(str, tokens, i, curr_token) ) 
 					continue;
 
@@ -1261,17 +1364,24 @@ void Tokenizador::TokenizarCasosEspeciales_UMA( const string& str, list<string>&
 		switch(c) {
 
 			case 'h':
-			case 'f':
-				if ( Tokenizar_url(str, tokens, i, curr_token) )  // http:,
+				if (Tokenizar_http(str,tokens, i, curr_token))
 					continue;
+				else
+					goto token;
+			case 'f':
+				if (Tokenizar_ftp(str,tokens, i, curr_token))
+					continue;
+				else
+					goto token;
 			
 			default:
 
-				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
-					i = str.find_first_not_of(this->delimiters,i);
-					if( i == str.npos ) return;
+				if( delimitadores[c] ) {  // es un delimitador indiscutible
+					i++;
 					continue;
 				}
+
+				token:
 
 				if( Tokenizar_acronimo(str, tokens, i, curr_token) )
 					continue;
@@ -1313,10 +1423,16 @@ void Tokenizador::TokenizarCasosEspeciales_UAE( const string& str, list<string>&
 		switch(c) {
 
 			case 'h':
-			case 'f':
-				//printf("intentando url\n");
-				if (Tokenizar_url(str,tokens, i, curr_token))
+				if (Tokenizar_http(str,tokens, i, curr_token))
 					continue;
+				else
+					goto token;
+			case 'f':
+				if (Tokenizar_ftp(str,tokens, i, curr_token))
+					continue;
+				else
+					goto token;
+			
 			case '@':
 				i++;
 				continue;
@@ -1324,12 +1440,13 @@ void Tokenizador::TokenizarCasosEspeciales_UAE( const string& str, list<string>&
 			default:
 				//printf("intentando default\n");
 
-				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador de los normales
-					i = str.find_first_not_of(this->delimiters,i);
-					if( i == str.npos ) return;
+				if( delimitadores[c] ) {  // es un delimitador de los normales
+					i++;
 					continue;
 				}
 				//printf("intentando email %d\n", i);
+
+				token:
 
 				if( Tokenizar_email_A(str, tokens, i, curr_token, canBeAcronym) )
 					continue;
@@ -1372,14 +1489,20 @@ void Tokenizador::TokenizarCasosEspeciales_UDAE( const string& str, list<string>
 		else 
 			c = str[i];
 		
+		//cout << "vamos por " << c << endl;	
+
 		switch(c) {
 
 			case 'h':
-			case 'f':
-				if (Tokenizar_url(str,tokens, i, curr_token))
+				if (Tokenizar_http(str,tokens, i, curr_token))
 					continue;
 				else
-					goto rest;
+					goto token;
+			case 'f':
+				if (Tokenizar_ftp(str,tokens, i, curr_token))
+					continue;
+				else
+					goto token;
 			
 			case '@':
 				i++;
@@ -1389,6 +1512,7 @@ void Tokenizador::TokenizarCasosEspeciales_UDAE( const string& str, list<string>
 				//canBeAcronym=false;
 			case '.':
 				heading_dot = true;
+				
 			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
 			case '5': case '6': case '7': case '8': case '9': 
 				
@@ -1399,12 +1523,15 @@ void Tokenizador::TokenizarCasosEspeciales_UDAE( const string& str, list<string>
 				
 			default:
 			
-				rest:
-				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
-					i = str.find_first_not_of(this->delimiters,i);
-					if( i == str.npos ) return;
+				//cout << "es otra cosa " << delimitadores[c] << " - " << (int)exceptions[c] << endl;
+				if( delimitadores[c] ) {  // es un delimitador indiscutible
+					i++;
+					//cout << "delimitador saltado" << endl;
 					continue;
 				}
+				
+				token:
+				
 				if( Tokenizar_email_A(str, tokens, i, curr_token, canBeAcronym) )
 					continue;
 
@@ -1439,16 +1566,23 @@ void Tokenizador::TokenizarCasosEspeciales_UM( const string& str, list<string>& 
 		switch(c) {
 
 			case 'h':
-			case 'f':
-				if (Tokenizar_url(str,tokens, i, curr_token))
+				if (Tokenizar_http(str,tokens, i, curr_token))
 					continue;
+				else
+					goto token;
+			case 'f':
+				if (Tokenizar_ftp(str,tokens, i, curr_token))
+					continue;
+				else
+					goto token;
 				
 			default:
-				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
-					i = str.find_first_not_of(this->delimiters,i);
-					if( i == str.npos ) return;
+				if( delimitadores[c] ) {  // es un delimitador indiscutible
+					i++;
 					continue;
 				}
+
+				token:
 
 				if( Tokenizar_multipalabra(str, tokens, i, curr_token) )
 					continue;
@@ -1484,11 +1618,15 @@ void Tokenizador::TokenizarCasosEspeciales_UDAM( const string& str, list<string>
 		switch(c) {
 
 			case 'h':
-			case 'f':
-				if (Tokenizar_url(str,tokens, i, curr_token))
+				if (Tokenizar_http(str,tokens, i, curr_token))
 					continue;
 				else
-					goto rest;
+					goto token;
+			case 'f':
+				if (Tokenizar_ftp(str,tokens, i, curr_token))
+					continue;
+				else
+					goto token;
 			
 			case ',':
 				//canBeAcronym=false;
@@ -1502,13 +1640,13 @@ void Tokenizador::TokenizarCasosEspeciales_UDAM( const string& str, list<string>
 				
 			default:
 			
-				rest:
-				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
-					i = str.find_first_not_of(this->delimiters,i);
-					if( i == str.npos ) return;
+				if( delimitadores[c] ) {  // es un delimitador indiscutible
+					i++;
 					continue;
 				}
 				
+				token:
+
 				if( Tokenizar_acronimo(str, tokens, i, curr_token) ) 
 					continue;
 
@@ -1544,20 +1682,27 @@ void Tokenizador::TokenizarCasosEspeciales_UMAE( const string& str, list<string>
 		switch(c) {
 
 			case 'h':
-			case 'f':
-				if (Tokenizar_url(str,tokens, i, curr_token))
+				if (Tokenizar_http(str,tokens, i, curr_token))
 					continue;
+				else
+					goto token;
+			case 'f':
+				if (Tokenizar_ftp(str,tokens, i, curr_token))
+					continue;
+				else
+					goto token;
 			
 			case '@':
 				i++;
 				continue;
 
 			default:
-				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador de los normales
-					i = str.find_first_not_of(this->delimiters,i);
-					if( i == str.npos ) return;
+				if( delimitadores[c] ) {  // es un delimitador de los normales
+					i++;
 					continue;
 				}
+
+				token:
 
 				if( Tokenizar_email_AM(str, tokens, i, curr_token, canBeAcronym, canBeMultiword) )
 					continue;
@@ -1599,11 +1744,16 @@ void Tokenizador::TokenizarCasosEspeciales_UDEAM( const string& str, list<string
 		switch(c) {
 
 			case 'h':
-			case 'f':
-				if (Tokenizar_url(str,tokens, i, curr_token))
+				if (Tokenizar_http(str,tokens, i, curr_token))
 					continue;
 				else
-					goto rest;
+					goto token;
+			case 'f':
+				if (Tokenizar_ftp(str,tokens, i, curr_token))
+					continue;
+				else
+					goto token;
+			
 			case '@':
 				i++;
 				continue;
@@ -1619,13 +1769,13 @@ void Tokenizador::TokenizarCasosEspeciales_UDEAM( const string& str, list<string
 				
 			default:
 			
-				rest:
-				if( delimitadores[c] & !exceptions[c] ) {  // es un delimitador indiscutible
-					i = str.find_first_not_of(this->delimiters,i);
-					if( i == str.npos ) return;
+				if( delimitadores[c] ) {  // es un delimitador indiscutible
+					i++;
 					continue;
 				}
-				
+
+				token:
+
 				if( Tokenizar_email_AM(str, tokens, i, curr_token, canBeAcronym, canBeMultiword) ) 
 					continue;
 
@@ -1961,7 +2111,19 @@ void Tokenizador::DelimitadoresPalabra(const string& nuevodelimitadores) { this-
 void Tokenizador::AnyadirDelimitadoresPalabra(const string& nuevodelimitadores)
 {
 	this->delimiters += nuevodelimitadores;
-	// controlar repeticiones!!
+	
+	for( auto& c : nuevodelimitadores ) {
+
+		for( auto& d : this->delimiters ) 
+			if( c == d ) goto cont;
+		
+		this->delimiters += c;
+		cont:
+		continue;
+	}
+
+	for( auto c : nuevodelimitadores ) 
+		delimitadores[c] = true;
 }
 
 // G
