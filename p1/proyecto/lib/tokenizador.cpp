@@ -1,6 +1,4 @@
 #include "tokenizador.h"
-#include <iostream>
-
 #include <sys/stat.h> 		// para metadatos de archivos
 #include <sys/mman.h> 		// para memory mapping
 #include <fcntl.h> 			// para acceso a archivos
@@ -1980,29 +1978,41 @@ bool Tokenizador::Tokenizar_ftp( const unsigned char* input, const size_t& input
 bool Tokenizador::Tokenizar_http( const unsigned char* input, const size_t& input_size, unsigned char* const output, size_t& output_size, int& i) const {
 
 	int token_start = i;
-	int aux_i=i;
+	int aux_i=i, aux_j=output_size;
 	char c=0;
 
-	if( input_size-i>5 ) {  // to avoid ftp: thats followed by the end of the file
+	cout << "entrando en url, i=" << i << endl;
+
+	if( (input_size-i)>5 ) {  // to avoid ftp: thats followed by the end of the file
 
 		if( this->pasarAminuscSinAcentos ) {
 
 			// comprobación inicial
 			if( (conversion[input[i+1]]=='t') & (conversion[input[i+2]]=='t') & (conversion[input[i+3]]=='p') )	{
 			
-				output[i  ] = conversion[input[i  ]];	output[i+1] = conversion[input[i+1]]; 
-				output[i+2] = conversion[input[i+2]]; 	output[i+3] = conversion[input[i+3]];	
+				output[output_size] 	= conversion[input[i]];		output[output_size+1] = conversion[input[i+1]]; 
+				output[output_size+2] 	= conversion[input[i+2]]; 	output[output_size+3] = conversion[input[i+3]];	
 				
-				if( input[i+4]==':' ) // http:
-					aux_i = i+5;
+				if( input[i+4]==':' ) {// http:
+					aux_i += 5;
+					aux_j += 5;
+					//output[output_size+4] = ':';
+					
+				}
+				else if( (input_size-i>6) & conversion[input[i+4]]=='s' & input[i+5]==':' ) {  // https:
 
-				if( (input_size-i>6) & conversion[input[i+4]]=='s' & input[i+5]==':' ) {  // https:
-
-					output[i+4] = 's';
-					aux_i = i+6;
+					output[output_size+4] = 's';//, output[output_size+5] = ':';
+					aux_i += 6;
+					aux_j += 6;
+				}
+				else {
+					output_size += 4;  // place yourself after http
+					return false;
 				}
 
-				c = conversion[aux_i];  	// despues del :
+				c = conversion[input[aux_i]];  	// despues del :
+
+				cout << "c is " << c << " (" << aux_i << ") (" << aux_j << ")" << endl;
 
 				switch(c) {
 
@@ -2016,22 +2026,26 @@ bool Tokenizador::Tokenizar_http( const unsigned char* input, const size_t& inpu
 					case '=':
 					case '#':
 					case '@':
-						
-						output[aux_i] = c;
+						output[aux_j-1] = conversion[input[aux_i-1]]; 
+						output[aux_j] = c;
+						output_size = aux_j+1;
 						i = aux_i+1;  // después de lo que acabas de leer
 						break;
 
 					default:
 						if( !this->delimitadores[c] ) {
-							output[aux_i-1] = conversion[input[aux_i-1]]; 
-							output[aux_i] = c;
+							output[aux_j-1] = conversion[input[aux_i-1]]; 
+							output[aux_j] = c;
+							cout << "output jsut wrote " << c << " on position " << aux_j << endl;
 							i = aux_i+1;
+							output_size = aux_j+1;
 							break;
 						}
 						
 						else {
-							output[aux_i-1] = '\n';
+							output[aux_j-1] = '\n';
 							i = aux_i-1;
+							output_size = aux_j;
 							return true;
 						}
 				}
@@ -2039,7 +2053,7 @@ bool Tokenizador::Tokenizar_http( const unsigned char* input, const size_t& inpu
 				// leer resto del url
 				for( ; i<input_size; i++ ) {
 
-					c = conversion[i];
+					c = conversion[input[i]];
 
 					switch(c) {
 
@@ -2053,38 +2067,41 @@ bool Tokenizador::Tokenizar_http( const unsigned char* input, const size_t& inpu
 						case '=':
 						case '#':
 						case '@':
-							output[i] = c;
+							output[output_size++] = c;
 							break;
 	
 						default:
 							if( !this->delimitadores[c] ) {
-								output[i] = c;
+								output[output_size++] = c;
 							}
 							
 							else {
 								if( output[output_size] != '\n' )  // no petar a saltos de linea el archivo de salida
-									output[i++] = '\n';
+									output[output_size++] = '\n';
 								return true;
 							}
 					}
 				}
 			}
 		}
+	
 		else {
 
 			// comprobación inicial
 			if( (input[i+1]=='t') & (input[i+2]=='t') & (input[i+3]=='p') )	{
 			
-				output[i  ] = input[i  ];	output[i+1] = input[i+1]; 
-				output[i+2] = input[i+2]; 	output[i+3] = input[i+3];	
+				output[output_size] 	= input[i];		output[output_size+1] = input[i+1]; 
+				output[output_size+2] 	= input[i+2]; 	output[output_size+3] = input[i+3];	
 				
-				if( input[i+4]==':' ) // http:
-					aux_i = i+5;
+
+				if( input[i+4]==':' ) {// http:
+					aux_i, aux_j += 5;
+				}
 
 				if( (input_size-i>6) & input[i+4]=='s' & input[i+5]==':' ) {  // https:
 
-					output[i+4] = 's';
-					aux_i = i+6;
+					output[output_size+4] = 's';
+					aux_i, aux_j += 6;
 				}
 
 				c = aux_i;  	// despues del :
@@ -2102,21 +2119,23 @@ bool Tokenizador::Tokenizar_http( const unsigned char* input, const size_t& inpu
 					case '#':
 					case '@':
 						
-						output[aux_i] = c;
+						output[aux_j] = c;
 						i = aux_i+1;  // después de lo que acabas de leer
 						break;
 
 					default:
 						if( !this->delimitadores[c] ) {
-							output[aux_i-1] = input[aux_i-1]; 
-							output[aux_i] = c;
+							output[aux_j-1] = input[aux_i-1]; 
+							output[aux_j] = c;
 							i = aux_i+1;
+							output_size = aux_j+1;
 							break;
 						}
 						
 						else {
-							output[aux_i-1] = '\n';
+							output[aux_j-1] = '\n';
 							i = aux_i-1;
+							output_size = aux_j;
 							return true;
 						}
 				}
@@ -2138,23 +2157,24 @@ bool Tokenizador::Tokenizar_http( const unsigned char* input, const size_t& inpu
 						case '=':
 						case '#':
 						case '@':
-							output[i] = c;
+							output[output_size++] = c;
 							break;
 	
 						default:
 							if( !this->delimitadores[c] ) {
-								output[i] = c;
+								output[output_size++] = c;
 							}
 							
 							else {
 								if( output[output_size] != '\n' )  // no petar a saltos de linea el archivo de salida
-									output[i++] = '\n';
+									output[output_size++] = '\n';
 								return true;
 							}
 					}
 				}
 			}
 		}
+	
 	}
 
 	return false;
@@ -2755,7 +2775,7 @@ bool Tokenizador::Tokenizar_acronimo( const unsigned char* input, const size_t& 
 	bool just_dot = ( output_size>0 && output[output_size-1] != '\n');
 	i+=just_dot;
 	
-	cout << "	-- [A] -- i:" << i << " (" << input[i] << ") output_size:" << output_size << " just_dot:" << just_dot << endl;
+	//cout << "	-- [A] -- i:" << i << " (" << input[i] << ") output_size:" << output_size << " just_dot:" << just_dot << endl;
 
 	// hasta que te encuentres un . o un -
 	for( ; i<input_size; i++ ) {
@@ -2787,10 +2807,10 @@ bool Tokenizador::Tokenizar_acronimo( const unsigned char* input, const size_t& 
 					
 					if( output[output_size] != '\n' ) {  // no petar a saltos de linea el archivo de salida
 						output[output_size++] = '\n';
-						cout << " -- [A] -- salto de linea en " << output_size-1 << endl;
+						//cout << " -- [A] -- salto de linea en " << output_size-1 << endl;
 					}
 
-					cout << "parando acronimo con i=" << i << " (" << output_size << ") en " << input[i] << endl;
+					//cout << "parando acronimo con i=" << i << " (" << output_size << ") en " << input[i] << endl;
 					i++;
 					return true;
 				}
@@ -2875,7 +2895,7 @@ bool Tokenizador::Tokenizar_acronimo( const unsigned char* input, const size_t& 
 				if( this->delimitadores[c] ) {  // entonces cortamos aqui
 					if( output[output_size] != '\n' )  // no petar a saltos de linea el archivo de salida
 						output[output_size++] = '\n';
-					return false;
+					return true;
 				}
 				output[output_size++] = c;
 
@@ -2891,7 +2911,7 @@ bool Tokenizador::Tokenizar_acronimo( const unsigned char* input, const size_t& 
 // X
 bool Tokenizador::Tokenizar_multipalabra( const unsigned char* input, const size_t& input_size, unsigned char* const output, size_t& output_size, int& i ) const {
 
-	cout << "	-- [M] -- i:" << i << " (" << input[i] << ") output_size:" << output_size << endl;
+	//cout << "	-- [M] -- i:" << i << " (" << input[i] << ") output_size:" << output_size << endl;
 
 	unsigned char c;
 	bool just_dash = ( output_size>0 && output[output_size-1] != '\n');
@@ -2922,9 +2942,10 @@ bool Tokenizador::Tokenizar_multipalabra( const unsigned char* input, const size
 				if( this->delimitadores[c] ) {  // entonces cortamos aqui
 					if( output[output_size] != '\n' ) { // no petar a saltos de linea el archivo de salida
 						output[output_size++] = '\n';
+						//cout << "cortando en i=" << i << endl; 
 						i++;
 					}
-					return false;
+					return true;
 				}
 				output[output_size++] = c;
 
