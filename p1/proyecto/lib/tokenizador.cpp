@@ -376,11 +376,13 @@ bool Tokenizador::Tokenizar_decimal( const string& str, list<string>& tokens, in
 					i++;
 					tokens.push_back(curr_token);
 
+					/*
 					if( str[i]=='%' || str[i] == '$' ) {
 						curr_token.clear();
 						curr_token += str[i++];
 						tokens.push_back(curr_token);
 					}
+					*/
 
 					return true;
 				}
@@ -1646,8 +1648,10 @@ void Tokenizador::TokenizarCasosEspeciales_UDAM( const string& str, list<string>
 			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
 			case '5': case '6': case '7': case '8': case '9': 
 				
-				if( Tokenizar_decimal( str, tokens, i, curr_token, heading_dot ) ) // quitará la coma inicial si falla
+				if( Tokenizar_decimal( str, tokens, i, curr_token, heading_dot ) ) { // quitará la coma inicial si falla
+					heading_dot = 0;
 					continue;
+				}
 				
 			default:
 				heading_dot = 0;
@@ -2198,10 +2202,65 @@ bool Tokenizador::Tokenizar_decimal( const unsigned char* input, const size_t& i
 	int token_start=i, output_start=output_size;
 
 	// tiene que haber cero al principio
-	if( heading_zero ) {
-		output[  output_size] 	= '0';
-		output[++output_size] 	= heading_zero;
+	if( heading_zero!=0 ) {
+		//cout << "a heading zero ladies and gentlemen at i=" << i << "(" << heading_zero << ")	" << endl;
+		output[output_size++] 	= '0';
+		output[output_size++] 	= heading_zero;
 	}
+
+	// establecer que el número ya está empezado
+	for( ; i<input_size; i++ ) {
+
+		c = input[i];
+
+		switch(c) {
+
+			case ',':  // TODO
+			case '.':
+				if( just_dot ) {   // its a normal token
+					
+					i--; 			// habrá que leer el ., otra vez, por si acaso pertenece a un decimal siguiente
+					output[output_size-1] = '\n';
+									// cambiamos el ., que escribimos por un \n, y dejamos output_size en la siguiente posición
+					return true;
+				}
+				just_dot = true;
+				output[output_size++] = c;
+				continue;
+			
+			case '0': case '1': case '2': case '3': case '4':
+			case '5': case '6': case '7': case '8': case '9':
+				just_dot = false;
+				output[output_size++] = c;
+				i++;
+				goto rest;
+
+			default:
+				if( this->delimitadores[c] ) {  // 123,23- ó 123,23& Delimit right here
+					
+					i++; 		// colocar después del delimitador
+					if( just_dot ) { // 123.&
+
+						output[output_size-1] = '\n';
+									// cambiamos el ., que escribimos por un \n, y dejamos output_size en la siguiente posición
+						return true;
+					}
+
+					if( output[output_size] != '\n' )  // no petar a saltos de linea el archivo de salida
+						output[output_size++] = '\n';
+
+					return true;
+				}
+				else {  // 123,3a 123.34,123a ABORT, nunca fue un decimal. Es un acronimo que se cortaba en la coma.
+
+					i=token_start;
+					output_size=output_start;
+					return false;  
+				}
+		}
+	}
+
+	rest:
 
 	for( ; i<input_size; i++ ) {
 
@@ -2228,6 +2287,20 @@ bool Tokenizador::Tokenizar_decimal( const unsigned char* input, const size_t& i
 				output[output_size++] = c;
 				continue;
 
+			case '%':
+			case '$':
+				if( just_dot ) {  // 123.$ should not be added
+					output[output_size-1]='\n';
+					return true;
+				}
+				else { // 123.23$
+					output[output_size++] = '\n';
+					output[output_size++] = c;
+					output[output_size++] = '\n';
+					i++;
+					return true;
+				}
+
 			default:
 				if( this->delimitadores[c] ) {  // 123,23- ó 123,23& Delimit right here
 					
@@ -2252,6 +2325,8 @@ bool Tokenizador::Tokenizar_decimal( const unsigned char* input, const size_t& i
 				}
 		}
 	}
+
+
 	if( just_dot ) 
 		output_size--;  // establecer final del archivo?
 	
@@ -2773,7 +2848,7 @@ bool Tokenizador::Tokenizar_acronimo( const unsigned char* input, const size_t& 
 	bool just_dot = ( output_size>0 && output[output_size-1] != '\n');
 	i+=just_dot;
 	
-	cout << "	-- [A] -- i:" << i << " (" << input[i] << ") output_size:" << output_size << " just_dot:" << just_dot << endl;
+	//cout << "	-- [A] -- i:" << i << " (" << input[i] << ") output_size:" << output_size << " just_dot:" << just_dot << endl;
 
 	// hasta que te encuentres un . o un -
 	for( ; i<input_size; i++ ) {
@@ -2811,9 +2886,9 @@ bool Tokenizador::Tokenizar_acronimo( const unsigned char* input, const size_t& 
 						//cout << " -- [A] -- salto de linea en " << output_size-1 << endl;
 					}
 
-					cout << "parando acronimo con i=" << i << " (" << output_size << ") en " << input[i] << endl;
+					//cout << "parando acronimo con i=" << i << " (" << output_size << ") en " << input[i] << endl;
 					i++;
-					cout << "i after leaving: " << i << endl;
+					//cout << "i after leaving: " << i << endl;
 					return true;
 				}
 				output[output_size++] = c;
@@ -2848,7 +2923,7 @@ bool Tokenizador::Tokenizar_acronimo( const unsigned char* input, const size_t& 
 				if( this->delimitadores[c] ) {  // entonces cortamos aqui
 					if( output[output_size] != '\n' ) { // no petar a saltos de linea el archivo de salida
 						if( just_dot ) {
-							cout << "iops just dot is correct" << endl;
+							//cout << "iops just dot is correct" << endl;
 							output[output_size-1] = '\n'; 
 						}
 						else
@@ -2923,7 +2998,7 @@ bool Tokenizador::Tokenizar_acronimo( const unsigned char* input, const size_t& 
 // X
 bool Tokenizador::Tokenizar_multipalabra( const unsigned char* input, const size_t& input_size, unsigned char* const output, size_t& output_size, int& i ) const {
 
-	cout << "	-- [M] -- i:" << i << " (" << input[i] << ") output_size:" << output_size << endl;
+	//cout << "	-- [M] -- i:" << i << " (" << input[i] << ") output_size:" << output_size << endl;
 
 	unsigned char c;
 	bool just_dash = ( output_size>0 && output[output_size-1] != '\n');
@@ -3263,7 +3338,7 @@ void Tokenizador::TokenizarCasosEspeciales_UDA( const unsigned char* input, cons
 			case '.':
 				heading_dot = c;
 				i++;
-				break;
+				continue;
 
 			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
 			case '5': case '6': case '7': case '8': case '9': 
@@ -3453,7 +3528,7 @@ void Tokenizador::TokenizarCasosEspeciales_UDAE( const unsigned char* input, con
 			case '.':
 				heading_dot = c;
 				i++;
-				break;
+				continue;
 
 			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
 			case '5': case '6': case '7': case '8': case '9': 
@@ -3571,6 +3646,7 @@ void Tokenizador::TokenizarCasosEspeciales_UDAM( const unsigned char* input, con
 					break;
 			
 			case '-':
+				heading_dot = 0;
 				i++;
 				continue;
 
@@ -3578,7 +3654,7 @@ void Tokenizador::TokenizarCasosEspeciales_UDAM( const unsigned char* input, con
 			case '.':
 				heading_dot = c;
 				i++;
-				break;
+				continue;
 
 			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
 			case '5': case '6': case '7': case '8': case '9': 
@@ -3716,7 +3792,7 @@ void Tokenizador::TokenizarCasosEspeciales_UDEAM( const unsigned char* input, co
 			case '.':
 				i++;
 				heading_dot = c;
-				break;
+				continue;
 
 			case '0': case '1': case '2': case '3': case '4': // ,123a  la coma se tiene que descartar igual
 			case '5': case '6': case '7': case '8': case '9': 
