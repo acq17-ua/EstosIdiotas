@@ -1655,6 +1655,7 @@ bool Tokenizador::Tokenizar_email_AM( const unsigned char* input, const size_t& 
 			case '-':  	// no era un email, aún podría ser un multiword.  Multiword tendrá que comprobar si curr_token está vacío o no.
 				curr_token += c;
 				canBeMultiword = true;
+				cout << "encountered a - in token, no longer email -- " << curr_token << endl;
 				return false;
 
 			case '@':
@@ -1798,8 +1799,11 @@ bool Tokenizador::Tokenizar_acronimo( const unsigned char* input, const size_t& 
 				break;
 
 			case '-':   // not an acronym, could be multiword
-				if( this->delimitadores[(unsigned char)'-'] ) 
+				if( this->delimitadores[(unsigned char)'-'] ) {
+					cout << "acronym failed, could be muw" << endl;
+					curr_token += c;
 					return false;
+				}
 
 			default:
 				if( this->delimitadores[c] ) { 		
@@ -1845,12 +1849,16 @@ bool Tokenizador::Tokenizar_multipalabra( const unsigned char* input, const size
 			}
 		}
 	}
+
+	//cout << "reading mw, on c=" << input[i] << " i=" << i << ", currtoken " << curr_token << endl; 
+
 	for( ; i<input_size; i++ ) {
 
 		if( this->pasarAminuscSinAcentos )
 			c = conversion[(unsigned char)input[i]];
 		else
 			c = (unsigned char)input[i];
+
 
 		if( c!='-' ) {
 
@@ -3219,6 +3227,8 @@ void Tokenizador::TokenizarCasosEspeciales_UDAM( const unsigned char* input, con
 
 		if( Tokenizar_acronimo(input, input_size, tokens, i, curr_token) ) 
 			continue;
+
+		cout << "entering mw with " << i << " " << input[i] << " currtoken " << curr_token << endl; 
 
 		if( Tokenizar_multipalabra(input, input_size, tokens, i, curr_token) )
 			continue;
