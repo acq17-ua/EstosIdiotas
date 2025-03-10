@@ -1841,21 +1841,24 @@ bool Tokenizador::Tokenizar_ftp( const unsigned char* input, const size_t& input
 					case '=':
 					case '#':
 					case '@':
-						
-						output[i+4] = c;
+						output[output_size+3] = ':'; // :
+						output[output_size+4] = c;
+						output_size += 5; 
 						i += 5;  // después de lo que acabas de leer
 						break;
 
 					default:
 						if( !this->delimitadores[c] ) {
-							output[i+3] = conversion[input[i+3]]; 
+							output[i+3] = ':'; 
 							output[i+4] = c;
 							i += 5;
+							output_size += 5;
 						}
 						
 						else {
-							output[i+3] = '\n';
+							output[i+3] = '\n'; // en vez del :
 							i += 3;
+							output_size += 3;
 							return true;
 						}
 				}
@@ -1863,7 +1866,7 @@ bool Tokenizador::Tokenizar_ftp( const unsigned char* input, const size_t& input
 				// leer resto del url
 				for( ; i<input_size; i++ ) {
 
-					c = conversion[i];
+					c = conversion[input[i]];
 
 					switch(c) {
 
@@ -1877,27 +1880,29 @@ bool Tokenizador::Tokenizar_ftp( const unsigned char* input, const size_t& input
 						case '=':
 						case '#':
 						case '@':
-							output[i] = c;
+							output[output_size++] = c;
 							break;
 	
 						default:
 							if( !this->delimitadores[c] ) {
-								output[i] = c;
+								output[output_size++] = c;
 							}
 							
 							else {
 								if( output[output_size] != '\n' )  // no petar a saltos de linea el archivo de salida
-									output[i++] = '\n';
+									output[output_size++] = '\n';
 								return true;
 							}
 					}
 				}
 			}
 		}
-		else {
+		
+		if( this->pasarAminuscSinAcentos ) {
+
 			// comprobación inicial
 			if( (input[i+1]=='t') & (input[i+2]=='p') & (input[i+3]==':') )	{
-
+			
 				output[i  ] = input[i  ];	output[i+1] = input[i+1]; 
 				output[i+2] = input[i+2]; 	
 				
@@ -1916,21 +1921,24 @@ bool Tokenizador::Tokenizar_ftp( const unsigned char* input, const size_t& input
 					case '=':
 					case '#':
 					case '@':
-						
-						output[i+4] = c;
+						output[output_size+3] = ':'; // :
+						output[output_size+4] = c;
+						output_size += 5; 
 						i += 5;  // después de lo que acabas de leer
 						break;
 
 					default:
 						if( !this->delimitadores[c] ) {
-							output[i+3] = input[i+3]; 
+							output[i+3] = ':'; 
 							output[i+4] = c;
 							i += 5;
+							output_size += 5;
 						}
 						
 						else {
-							output[i+3] = '\n';
+							output[i+3] = '\n'; // en vez del :
 							i += 3;
+							output_size += 3;
 							return true;
 						}
 				}
@@ -1938,7 +1946,7 @@ bool Tokenizador::Tokenizar_ftp( const unsigned char* input, const size_t& input
 				// leer resto del url
 				for( ; i<input_size; i++ ) {
 
-					c = i;
+					c = input[i];
 
 					switch(c) {
 
@@ -1952,17 +1960,17 @@ bool Tokenizador::Tokenizar_ftp( const unsigned char* input, const size_t& input
 						case '=':
 						case '#':
 						case '@':
-							output[i] = c;
+							output[output_size++] = c;
 							break;
 	
 						default:
 							if( !this->delimitadores[c] ) {
-								output[i] = c;
+								output[output_size++] = c;
 							}
 							
 							else {
 								if( output[output_size] != '\n' )  // no petar a saltos de linea el archivo de salida
-									output[i++] = '\n';
+									output[output_size++] = '\n';
 								return true;
 							}
 					}
@@ -1981,9 +1989,9 @@ bool Tokenizador::Tokenizar_http( const unsigned char* input, const size_t& inpu
 	int aux_i=i, aux_j=output_size;
 	char c=0;
 
-	cout << "entrando en url, i=" << i << endl;
+	//cout << "entrando en url, i=" << i << endl;
 
-	if( (input_size-i)>5 ) {  // to avoid ftp: thats followed by the end of the file
+	if( (input_size-i)>5 ) {  // to avoid http: thats followed by the end of the file
 
 		if( this->pasarAminuscSinAcentos ) {
 
@@ -2012,7 +2020,7 @@ bool Tokenizador::Tokenizar_http( const unsigned char* input, const size_t& inpu
 
 				c = conversion[input[aux_i]];  	// despues del :
 
-				cout << "c is " << c << " (" << aux_i << ") (" << aux_j << ")" << endl;
+				//cout << "c is " << c << " (" << aux_i << ") (" << aux_j << ")" << endl;
 
 				switch(c) {
 
@@ -2026,7 +2034,7 @@ bool Tokenizador::Tokenizar_http( const unsigned char* input, const size_t& inpu
 					case '=':
 					case '#':
 					case '@':
-						output[aux_j-1] = conversion[input[aux_i-1]]; 
+						output[aux_j-1] = ':'; 
 						output[aux_j] = c;
 						output_size = aux_j+1;
 						i = aux_i+1;  // después de lo que acabas de leer
@@ -2034,9 +2042,9 @@ bool Tokenizador::Tokenizar_http( const unsigned char* input, const size_t& inpu
 
 					default:
 						if( !this->delimitadores[c] ) {
-							output[aux_j-1] = conversion[input[aux_i-1]]; 
+							output[aux_j-1] = ':'; 
 							output[aux_j] = c;
-							cout << "output jsut wrote " << c << " on position " << aux_j << endl;
+							//cout << "output jsut wrote " << c << " on position " << aux_j << endl;
 							i = aux_i+1;
 							output_size = aux_j+1;
 							break;
@@ -3531,7 +3539,7 @@ void Tokenizador::TokenizarCasosEspeciales_UDAM( const unsigned char* input, con
 	
 	while( i<input_size ) {
 		
-		cout << "[" << i << "] " << conversion[(unsigned char)input[i]] << endl; 
+		//cout << "[" << i << "] " << conversion[(unsigned char)input[i]] << endl; 
 		canBeMultiword = false;
 
 		if( this->pasarAminuscSinAcentos )
@@ -3820,7 +3828,7 @@ void Tokenizador::TokenizarCasosEspeciales( const unsigned char* input, const si
 					this->TokenizarCasosEspeciales_UDEAM(input, input_size, output, output_size);
 				}
 				else {
-					cout << "entering " << endl;
+					//cout << "entering " << endl;
 					this->TokenizarCasosEspeciales_UDAM(input, input_size, output, output_size);
 				}
 			}
@@ -4051,9 +4059,9 @@ bool Tokenizador::Tokenizar (const string& input, const string& output) const
 		}
 		
 		// copies tokens list into file and updates fileSize_output 
-		cout << "right before call " << fileSize_input << " " << fileSize_output << " " << memory_needed << endl;
+		//cout << "right before call " << fileSize_input << " " << fileSize_output << " " << memory_needed << endl;
 		this->Tokenizar(map_input, fileSize_input, map_output, fileSize_output);
-		cout << "right after call" << endl;
+		//cout << "right after call" << endl;
 
 		// CLOSE EVERYTHING
 		munmap(map_input, fileSize_input);
