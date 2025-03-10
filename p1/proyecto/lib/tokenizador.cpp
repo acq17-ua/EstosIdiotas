@@ -2231,25 +2231,16 @@ bool Tokenizador::Tokenizar_decimal( const unsigned char* input, const size_t& i
 			default:
 				if( this->delimitadores[c] ) {  // 123,23- ó 123,23& Delimit right here
 					
+					i++; 		// colocar después del delimitador
 					if( just_dot ) { // 123.&
 
-						i++; 		// colocar después del delimitador
 						output[output_size-1] = '\n';
 									// cambiamos el ., que escribimos por un \n, y dejamos output_size en la siguiente posición
 						return true;
 					}
 
-					i++;
 					if( output[output_size] != '\n' )  // no petar a saltos de linea el archivo de salida
 						output[output_size++] = '\n';
-
-					/*   TODO esto hacerlo en el switch superior
-					if( input[i]=='%' || input[i] == '$' ) {
-						curr_token.clear();
-						curr_token += input[i++];
-						tokens.push_back(curr_token);
-					}
-					*/
 
 					return true;
 				}
@@ -2314,7 +2305,6 @@ bool Tokenizador::Tokenizar_email_O( const unsigned char* input, const size_t& i
 	if( this->delimitadores[(unsigned char)input[i]] ) {   // sdasda@{.-_@ or other delimiter} Not an email anymore, delimited at previous @
 
 		output[output_size-1] = '\n';
-		//tokens.push_back(string(curr_token, 0, curr_token.size()-1));
 		i++;
 		return true;
 	}
@@ -2677,8 +2667,9 @@ bool Tokenizador::Tokenizar_email_AM( const unsigned char* input, const size_t& 
 
 			default:
 				if( this->delimitadores[c] ) {  // not email. Over right here.
-					if( output[output_size] != '\n' )  // no petar a saltos de linea el archivo de salida
+					if( output[output_size] != '\n' ) { // no petar a saltos de linea el archivo de salida
 						output[output_size++] = '\n';
+					}
 					i++;
 					return true;
 				}
@@ -2714,8 +2705,7 @@ bool Tokenizador::Tokenizar_email_AM( const unsigned char* input, const size_t& 
 					just_dot = true;
 					output[output_size++] = c;
 				}
-				else { 		// sda@a__ | sad@a_a_a__a  gets delimited at ..
-
+				else { 		// sda@a__ | sad@a_a_a__a  gets delimited at first dot
 					output[output_size-1] = '\n';
 					i++; // get placed after dashes
 					return true;
@@ -2783,7 +2773,7 @@ bool Tokenizador::Tokenizar_acronimo( const unsigned char* input, const size_t& 
 	bool just_dot = ( output_size>0 && output[output_size-1] != '\n');
 	i+=just_dot;
 	
-	//cout << "	-- [A] -- i:" << i << " (" << input[i] << ") output_size:" << output_size << " just_dot:" << just_dot << endl;
+	cout << "	-- [A] -- i:" << i << " (" << input[i] << ") output_size:" << output_size << " just_dot:" << just_dot << endl;
 
 	// hasta que te encuentres un . o un -
 	for( ; i<input_size; i++ ) {
@@ -2814,12 +2804,16 @@ bool Tokenizador::Tokenizar_acronimo( const unsigned char* input, const size_t& 
 				if( this->delimitadores[c] ) {  // era un token normal
 					
 					if( output[output_size] != '\n' ) {  // no petar a saltos de linea el archivo de salida
-						output[output_size++] = '\n';
+						if( just_dot )
+							output[output_size-1] = '\n'; 
+						else
+							output[output_size++] = '\n';
 						//cout << " -- [A] -- salto de linea en " << output_size-1 << endl;
 					}
 
-					//cout << "parando acronimo con i=" << i << " (" << output_size << ") en " << input[i] << endl;
+					cout << "parando acronimo con i=" << i << " (" << output_size << ") en " << input[i] << endl;
 					i++;
+					cout << "i after leaving: " << i << endl;
 					return true;
 				}
 				output[output_size++] = c;
@@ -2853,12 +2847,18 @@ bool Tokenizador::Tokenizar_acronimo( const unsigned char* input, const size_t& 
 			default:
 				if( this->delimitadores[c] ) {  // entonces cortamos aqui
 					if( output[output_size] != '\n' ) { // no petar a saltos de linea el archivo de salida
-						output[output_size++] = '\n';
-						i++;
+						if( just_dot ) {
+							cout << "iops just dot is correct" << endl;
+							output[output_size-1] = '\n'; 
+						}
+						else
+							output[output_size++] = '\n';
 					}
-					return false;
+					i++;
+					return true;
 				}
 				output[output_size++] = c;
+				just_dot = false;
 
 			break;
 		}
@@ -2901,8 +2901,12 @@ bool Tokenizador::Tokenizar_acronimo( const unsigned char* input, const size_t& 
 			
 			default:
 				if( this->delimitadores[c] ) {  // entonces cortamos aqui
-					if( output[output_size] != '\n' )  // no petar a saltos de linea el archivo de salida
-						output[output_size++] = '\n';
+					if( output[output_size] != '\n' ) {  // no petar a saltos de linea el archivo de salida
+						if( just_dot )
+							output[output_size-1] = '\n'; 
+						else
+							output[output_size++] = '\n';	
+					}
 					return true;
 				}
 				output[output_size++] = c;
@@ -2919,7 +2923,7 @@ bool Tokenizador::Tokenizar_acronimo( const unsigned char* input, const size_t& 
 // X
 bool Tokenizador::Tokenizar_multipalabra( const unsigned char* input, const size_t& input_size, unsigned char* const output, size_t& output_size, int& i ) const {
 
-	//cout << "	-- [M] -- i:" << i << " (" << input[i] << ") output_size:" << output_size << endl;
+	cout << "	-- [M] -- i:" << i << " (" << input[i] << ") output_size:" << output_size << endl;
 
 	unsigned char c;
 	bool just_dash = ( output_size>0 && output[output_size-1] != '\n');
@@ -2949,13 +2953,16 @@ bool Tokenizador::Tokenizar_multipalabra( const unsigned char* input, const size
 			default:
 				if( this->delimitadores[c] ) {  // entonces cortamos aqui
 					if( output[output_size] != '\n' ) { // no petar a saltos de linea el archivo de salida
-						output[output_size++] = '\n';
-						//cout << "cortando en i=" << i << endl; 
-						i++;
+						if( just_dash )
+							output[output_size-1] = '\n'; 
+						else
+							output[output_size++] = '\n';
 					}
+					i++;
 					return true;
 				}
 				output[output_size++] = c;
+				just_dash = false;
 
 			break;
 		}
