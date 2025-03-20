@@ -1,31 +1,181 @@
 #include "indexadorInformacion.h"
 
-InfTermDoc::InfTermDoc (const InfTermDoc& ) {}
-InfTermDoc::InfTermDoc () {}		
-InfTermDoc::~InfTermDoc () {}		
-InfTermDoc& InfTermDoc::operator= (const InfTermDoc& ) {}
+InfTermDoc::InfTermDoc () 
+{
+	this->ft = 0;
+	this->posTerm = list<int>();
+}	
 
-InformacionTermino::InformacionTermino(const InformacionTermino &) {}
-InformacionTermino::InformacionTermino() {}		
-InformacionTermino::~InformacionTermino() {}		
-InformacionTermino& InformacionTermino::operator=(const InformacionTermino &) {}
+InfTermDoc::InfTermDoc (const InfTermDoc& o) 
+{
+	this->ft = o.ft;
+	this->posTerm = o.posTerm;
+}
 
-InfDoc::InfDoc(const InfDoc &) {}
-InfDoc::InfDoc() {}	
-InfDoc::~InfDoc() {}
-InfDoc& InfDoc::operator=(const InfDoc &) {}
 
-InfColeccionDocs::InfColeccionDocs (const InfColeccionDocs &) {}
-InfColeccionDocs::InfColeccionDocs () {}
-InfColeccionDocs::~InfColeccionDocs () {}
-InfColeccionDocs& InfColeccionDocs::operator= (const InfColeccionDocs &) {}
+InfTermDoc::~InfTermDoc ()
+{
+	this->ft = 0;
+	this->posTerm.clear();
+}
 
-InformacionTerminoPregunta::InformacionTerminoPregunta (const InformacionTerminoPregunta &) {}
-InformacionTerminoPregunta::InformacionTerminoPregunta () {}
-InformacionTerminoPregunta::~InformacionTerminoPregunta () {}
-InformacionTerminoPregunta& InformacionTerminoPregunta::operator= (const InformacionTerminoPregunta &) {}
+InfTermDoc& InfTermDoc::operator= (const InfTermDoc& o) 
+{
+	this->ft = o.ft;
+	this->posTerm = o.posTerm;
+	return *this;
+}
 
-InformacionPregunta::InformacionPregunta (const InformacionPregunta &) {}
-InformacionPregunta::InformacionPregunta () {}	
-InformacionPregunta::~InformacionPregunta () {}
-InformacionPregunta& InformacionPregunta::operator= (const InformacionPregunta &) {}
+InformacionTermino::InformacionTermino() 
+{
+	this->ftc = 0;
+	this->l_docs = unordered_map<int,InfTermDoc>();
+}	
+
+InformacionTermino::InformacionTermino(const InformacionTermino& o) 
+{
+	this->ftc = o.ftc;
+	this->l_docs = o.l_docs;
+}
+
+InformacionTermino::~InformacionTermino() 
+{
+	this->ftc = 0;
+	this->l_docs.clear();
+}	
+
+InformacionTermino& InformacionTermino::operator=(const InformacionTermino& o) 
+{
+	this->ftc = o.ftc;
+	this->l_docs = o.l_docs;
+	return *this;
+}
+
+InfDoc::InfDoc() 
+{
+	idDoc = InfDoc::nextId++;
+	numPal = numPalSinParada = numPalDiferentes = tamBytes = 0;
+	fechaModificacion = { 0, 0, 0, 0, 0, 0 };
+}	
+
+InfDoc::InfDoc(const InfDoc& o) 
+{
+	this->idDoc = o.idDoc;
+	this->numPal = o.numPal;
+	this->numPalSinParada = o.numPalSinParada;
+	this->numPalDiferentes = o.numPalDiferentes;
+	this->tamBytes = o.tamBytes;
+	this->fechaModificacion = o.fechaModificacion; 
+}
+
+InfDoc::~InfDoc() 
+{
+	idDoc = 0;
+	numPal = numPalSinParada = numPalDiferentes = tamBytes = 0;
+	fechaModificacion = { 0, 0, 0, 0, 0, 0 };
+}
+
+InfDoc& InfDoc::operator=(const InfDoc& o) 
+{
+	this->idDoc = o.idDoc;
+	this->numPal = o.numPal;
+	this->numPalSinParada = o.numPalSinParada;
+	this->numPalDiferentes = o.numPalDiferentes;
+	this->tamBytes = o.tamBytes;
+	this->fechaModificacion = o.fechaModificacion; 
+	
+	return *this;
+}
+
+InfColeccionDocs::InfColeccionDocs () 
+{
+	this->numDocs = 
+	this->numTotalPal = 
+	this->numTotalPalSinParada = 
+	this->numTotalPalDiferentes = 
+	this->tamBytes = 0;
+}
+
+InfColeccionDocs::InfColeccionDocs (const InfColeccionDocs& o) 
+{
+	this->numDocs = o.numDocs;
+	this->numTotalPal = o.numTotalPal;
+	this->numTotalPalSinParada = o.numTotalPalSinParada;
+	this->numTotalPalDiferentes = o.numTotalPalDiferentes;
+	this->tamBytes = o.tamBytes;
+}
+
+InfColeccionDocs::~InfColeccionDocs () 
+{
+	this->numDocs = 
+	this->numTotalPal = 
+	this->numTotalPalSinParada = 
+	this->numTotalPalDiferentes = 
+	this->tamBytes = 0;
+}
+
+InfColeccionDocs& InfColeccionDocs::operator= (const InfColeccionDocs& o) 
+{
+	this->numDocs = o.numDocs;
+	this->numTotalPal = o.numTotalPal;
+	this->numTotalPalSinParada = o.numTotalPalSinParada;
+	this->numTotalPalDiferentes = o.numTotalPalDiferentes;
+	this->tamBytes = o.tamBytes;
+
+	return *this;
+}
+
+InformacionTerminoPregunta::InformacionTerminoPregunta () 
+{
+	this->ft = 0;
+	this->posTerm = list<int>();
+}
+
+InformacionTerminoPregunta::InformacionTerminoPregunta (const InformacionTerminoPregunta& o) 
+{
+	this->ft = o.ft;
+	this->posTerm = o.posTerm;	
+}
+
+InformacionTerminoPregunta::~InformacionTerminoPregunta () 
+{
+	this->ft = 0;
+	this->posTerm.clear();
+}
+
+InformacionTerminoPregunta& InformacionTerminoPregunta::operator= (const InformacionTerminoPregunta& o) 
+{
+	this->ft = o.ft;
+	this->posTerm = o.posTerm;
+	return *this;
+}
+
+InformacionPregunta::InformacionPregunta () 
+{
+	this->numTotalPal = 
+	this->numTotalPalSinParada = 
+	this->numTotalPalDiferentes = 0;
+}	
+
+InformacionPregunta::InformacionPregunta (const InformacionPregunta& o) 
+{
+	this->numTotalPal = o.numTotalPal;
+	this->numTotalPalSinParada = o.numTotalPalSinParada;
+	this->numTotalPalDiferentes = o.numTotalPalDiferentes;
+}
+
+InformacionPregunta::~InformacionPregunta () 
+{
+	this->numTotalPal = 
+	this->numTotalPalSinParada = 
+	this->numTotalPalDiferentes = 0;
+}
+
+InformacionPregunta& InformacionPregunta::operator= (const InformacionPregunta& o) 
+{
+	this->numTotalPal = o.numTotalPal;
+	this->numTotalPalSinParada = o.numTotalPalSinParada;
+	this->numTotalPalDiferentes = o.numTotalPalDiferentes;
+
+	return *this;
+}
