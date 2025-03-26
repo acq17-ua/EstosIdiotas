@@ -33,6 +33,8 @@ class InfTermDoc {
 		~InfTermDoc ();		// Pone ft = 0 
 		InfTermDoc & operator= (const InfTermDoc &);
 
+		void clear();
+
 	private:
 		int ft;	
 		list<int> posTerm;	
@@ -61,6 +63,10 @@ class InformacionTermino {
 		InformacionTermino ();		// Inicializa ftc = 0
 		~InformacionTermino ();		// Pone ftc = 0 y vacía l_docs
 		InformacionTermino & operator= (const InformacionTermino &);
+
+		void clear();
+		bool doc(int id, InfTermDoc inf) const;
+
 
 	private:
 		int ftc;	// Frecuencia total del término en la colección
@@ -91,7 +97,13 @@ class InfDoc {
 		~InfDoc ();
 		InfDoc & operator= (const InfDoc &);
 
+		void clear();
+
+		int get_idDoc() const { return this->idDoc; }
+
+
 	private:
+		static inline int nextId = 1;
 		int idDoc;
 		int numPal;
 		int numPalSinParada;
@@ -123,6 +135,8 @@ class InfColeccionDocs {
 		~InfColeccionDocs ();
 		InfColeccionDocs & operator= (const InfColeccionDocs &);
 
+		void clear();
+
 	private:
 		int numDocs;		
 		int numTotalPal;	
@@ -153,6 +167,8 @@ class InformacionTerminoPregunta {
 		~InformacionTerminoPregunta ();
 		InformacionTerminoPregunta & operator= (const InformacionTerminoPregunta &);
 
+		void clear();
+
 	private:
 		int ft;
 		list<int> posTerm;
@@ -177,6 +193,8 @@ class InformacionPregunta {
 		InformacionPregunta ();	
 		~InformacionPregunta ();
 		InformacionPregunta & operator= (const InformacionPregunta &);
+
+		void clear();
 
 	private:
 		int numTotalPal;	

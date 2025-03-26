@@ -3,6 +3,7 @@
 using namespace std;
 
 class Tokenizador {
+
 	friend ostream& operator<<(ostream&, const Tokenizador&);	 
 		// cout << "DELIMITADORES: " << delimiters << " TRATA CASOS ESPECIALES: " << casosEspeciales << " PASAR A MINUSCULAS Y SIN ACENTOS: " << pasarAminuscSinAcentos;
 		// Aunque se modifique el almacenamiento de los delimitadores por temas de eficiencia, 
@@ -74,14 +75,14 @@ class Tokenizador {
 		void CasosEspeciales (const bool& nuevoCasosEspeciales);
 		// Cambia la variable privada "casosEspeciales" 
 
-		bool CasosEspeciales ();
+		bool CasosEspeciales () const;
 		// Devuelve el contenido de la variable privada "casosEspeciales" 
 
 		void PasarAminuscSinAcentos (const bool& nuevoPasarAminuscSinAcentos);
 		// Cambia la variable privada "pasarAminuscSinAcentos". 
 		// Atenci?n al formato de codificaci?n del corpus (comando "file" de Linux). Para la correcci?n de la pr?ctica se utilizar? el formato actual (ISO-8859). 
 
-		bool PasarAminuscSinAcentos ();
+		bool PasarAminuscSinAcentos () const;
 		// Devuelve el contenido de la variable privada "pasarAminuscSinAcentos"
 		//
 

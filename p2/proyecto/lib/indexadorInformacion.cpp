@@ -26,6 +26,12 @@ InfTermDoc& InfTermDoc::operator= (const InfTermDoc& o)
 	return *this;
 }
 
+void InfTermDoc::clear()
+{
+	this->ft = 0;
+	this->posTerm.clear();
+}
+
 InformacionTermino::InformacionTermino() 
 {
 	this->ftc = 0;
@@ -49,6 +55,23 @@ InformacionTermino& InformacionTermino::operator=(const InformacionTermino& o)
 	this->ftc = o.ftc;
 	this->l_docs = o.l_docs;
 	return *this;
+}
+
+void InformacionTermino::clear() 
+{
+	this->ftc = 0;
+	this->l_docs.clear();
+}	
+
+bool InformacionTermino::doc(const int id, InfTermDoc inf) const 
+{
+	unordered_map<int,InfTermDoc>::const_iterator doc = this->l_docs.find(id);
+	
+	if( doc != this->l_docs.end() ) {
+		inf = doc->second;
+		return true;
+	}
+	return false;
 }
 
 InfDoc::InfDoc() 
@@ -85,6 +108,13 @@ InfDoc& InfDoc::operator=(const InfDoc& o)
 	this->fechaModificacion = o.fechaModificacion; 
 	
 	return *this;
+}
+
+void InfDoc::clear() 
+{
+	idDoc = 0;
+	numPal = numPalSinParada = numPalDiferentes = tamBytes = 0;
+	fechaModificacion = { 0, 0, 0, 0, 0, 0 };
 }
 
 InfColeccionDocs::InfColeccionDocs () 
@@ -125,6 +155,15 @@ InfColeccionDocs& InfColeccionDocs::operator= (const InfColeccionDocs& o)
 	return *this;
 }
 
+void InfColeccionDocs::clear () 
+{
+	this->numDocs = 
+	this->numTotalPal = 
+	this->numTotalPalSinParada = 
+	this->numTotalPalDiferentes = 
+	this->tamBytes = 0;
+}
+
 InformacionTerminoPregunta::InformacionTerminoPregunta () 
 {
 	this->ft = 0;
@@ -150,32 +189,45 @@ InformacionTerminoPregunta& InformacionTerminoPregunta::operator= (const Informa
 	return *this;
 }
 
-InformacionPregunta::InformacionPregunta () 
+void InformacionTerminoPregunta::clear() 
+{
+	this->ft = 0;
+	this->posTerm.clear();
+}
+
+InformacionPregunta::InformacionPregunta() 
 {
 	this->numTotalPal = 
 	this->numTotalPalSinParada = 
 	this->numTotalPalDiferentes = 0;
 }	
 
-InformacionPregunta::InformacionPregunta (const InformacionPregunta& o) 
+InformacionPregunta::InformacionPregunta(const InformacionPregunta& o) 
 {
 	this->numTotalPal = o.numTotalPal;
 	this->numTotalPalSinParada = o.numTotalPalSinParada;
 	this->numTotalPalDiferentes = o.numTotalPalDiferentes;
 }
 
-InformacionPregunta::~InformacionPregunta () 
+InformacionPregunta::~InformacionPregunta() 
 {
 	this->numTotalPal = 
 	this->numTotalPalSinParada = 
 	this->numTotalPalDiferentes = 0;
 }
 
-InformacionPregunta& InformacionPregunta::operator= (const InformacionPregunta& o) 
+InformacionPregunta& InformacionPregunta::operator=(const InformacionPregunta& o) 
 {
 	this->numTotalPal = o.numTotalPal;
 	this->numTotalPalSinParada = o.numTotalPalSinParada;
 	this->numTotalPalDiferentes = o.numTotalPalDiferentes;
 
 	return *this;
+}
+
+void InformacionPregunta::clear() 
+{
+	this->numTotalPal = 
+	this->numTotalPalSinParada = 
+	this->numTotalPalDiferentes = 0;
 }
