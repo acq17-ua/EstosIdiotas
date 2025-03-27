@@ -34,6 +34,7 @@ class InfTermDoc {
 		InfTermDoc & operator= (const InfTermDoc &);
 
 		void clear();
+		int get_ft() const { return ft; }
 
 	private:
 		int ft;	
@@ -65,8 +66,8 @@ class InformacionTermino {
 		InformacionTermino & operator= (const InformacionTermino &);
 
 		void clear();
-		bool doc(int id, InfTermDoc inf) const;
-
+		bool doc(const int id, InfTermDoc inf) const;
+		bool clearDoc(const int id);
 
 	private:
 		int ftc;	// Frecuencia total del término en la colección
@@ -82,6 +83,8 @@ class InformacionTermino {
 // Información de un documento
 class InfDoc { 
     
+	friend class InfColeccionDocs;
+
 	friend ostream& operator<<(ostream& s, const InfDoc& p) {
 		s 	<< "idDoc: " << p.idDoc 
 			<< "\tnumPal: " << p.numPal 
@@ -98,9 +101,7 @@ class InfDoc {
 		InfDoc & operator= (const InfDoc &);
 
 		void clear();
-
 		int get_idDoc() const { return this->idDoc; }
-
 
 	private:
 		static inline int nextId = 1;
@@ -136,6 +137,7 @@ class InfColeccionDocs {
 		InfColeccionDocs & operator= (const InfColeccionDocs &);
 
 		void clear();
+		void clearDoc(const InfDoc& d);
 
 	private:
 		int numDocs;		

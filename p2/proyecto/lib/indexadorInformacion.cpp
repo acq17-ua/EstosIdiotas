@@ -74,6 +74,17 @@ bool InformacionTermino::doc(const int id, InfTermDoc inf) const
 	return false;
 }
 
+bool InformacionTermino::clearDoc(const int id) 
+{
+	unordered_map<int,InfTermDoc>::const_iterator doc = this->l_docs.find(id);
+
+	if( doc != this->l_docs.end() ) {
+		this->ftc -= this->l_docs[id].get_ft();
+		return (this->l_docs.erase(id) != 0);
+	}
+	return false;
+}
+
 InfDoc::InfDoc() 
 {
 	idDoc = InfDoc::nextId++;
@@ -163,6 +174,16 @@ void InfColeccionDocs::clear ()
 	this->numTotalPalDiferentes = 
 	this->tamBytes = 0;
 }
+
+void InfColeccionDocs::clearDoc(const InfDoc& doc) {
+
+	this->numDocs--;
+	this->numTotalPal -= doc.numPal;
+	this->numTotalPalSinParada -= doc.numPalSinParada;
+	this->numTotalPalDiferentes -= doc.numPalDiferentes;
+	this->tamBytes -= doc.tamBytes;
+}
+
 
 InformacionTerminoPregunta::InformacionTerminoPregunta () 
 {

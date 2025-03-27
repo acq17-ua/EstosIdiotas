@@ -322,96 +322,90 @@ bool IndexadorHash::Devuelve(const string& word, const string& nomDoc, InfTermDo
 			return false;
 		}
 	}
-}  
+}
 
 bool IndexadorHash::Existe(const string& word) const 
 {
-
+	return (this->indice.find(word) != this->indice.end());
 }	 
 
 bool IndexadorHash::BorraDoc(const string& nomDoc) 
 {
+	unordered_map<std::string,InfDoc>::const_iterator doc = this->indiceDocs.find(nomDoc);
 
+	if( doc != this->indiceDocs.end() ) {
+
+		// a cada término
+		for( auto t : this->indice ) {   // pair<string,InformacionTermino>
+			
+			// actualizar ftc
+			// borrar entrada del doc en el término (si la hay)
+			t.second.clearDoc(doc->second.get_idDoc());
+		}
+
+		// Actualizar colección de documentos
+		this->informacionColeccionDocs.clearDoc(indiceDocs[nomDoc]);
+		
+		// Borrar el documento
+		this->indiceDocs.erase(nomDoc);
+
+		return true;
+	}
+	return false;
 } 
 
-void IndexadorHash::VaciarIndiceDocs() 
-{
+void IndexadorHash::VaciarIndiceDocs() 	{ this->indiceDocs.clear(); } 
 
-} 
+void IndexadorHash::VaciarIndicePreg() 	{ this->indicePregunta.clear(); } 
 
-void IndexadorHash::VaciarIndicePreg() 
-{
+int IndexadorHash::NumPalIndexadas() const 	{ return this->indice.size(); } 
 
-} 
-
-int IndexadorHash::NumPalIndexadas() const 
-{
-
-} 
-
-string IndexadorHash::DevolverFichPalParada () const 
-{
-
-} 
+string IndexadorHash::DevolverFichPalParada () const { return this->ficheroStopWords; } 
 
 void IndexadorHash::ListarPalParada() const 
 {
-
+	for( const string& s : this->stopWords ) { // TODO
+		cout << s << endl;
+	}
 } 
 
-int IndexadorHash::NumPalParada() const 
-{
+int IndexadorHash::NumPalParada() const	{ return this->stopWords.size(); } 
 
-} 
+string IndexadorHash::DevolverDelimitadores () const { return this->tok.DelimitadoresPalabra(); } 
 
-string IndexadorHash::DevolverDelimitadores () const 
-{
+bool IndexadorHash::DevolverCasosEspeciales () const { return this->tok.CasosEspeciales(); }
 
-} 
+bool IndexadorHash::DevolverPasarAminuscSinAcentos () const { return this->tok.PasarAminuscSinAcentos(); }
 
-bool IndexadorHash::DevolverCasosEspeciales () const 
-{
+bool IndexadorHash::DevolverAlmacenarPosTerm () const { return this->almacenarPosTerm; }
 
-}
+string IndexadorHash::DevolverDirIndice () const { return this->directorioIndice; } 
 
-bool IndexadorHash::DevolverPasarAminuscSinAcentos () const 
-{
+int IndexadorHash::DevolverTipoStemming () const { return this->tipoStemmer; } 
 
-}
-
-bool IndexadorHash::DevolverAlmacenarPosTerm () const 
-{
-
-}
-
-string IndexadorHash::DevolverDirIndice () const 
-{
-
-} 
-
-int IndexadorHash::DevolverTipoStemming () const 
-{
-
-} 
-
-void IndexadorHash::ListarInfColeccDocs() const 
-{
-
-} 
+void IndexadorHash::ListarInfColeccDocs() const { cout << this->informacionColeccionDocs << endl; } 
 
 void IndexadorHash::ListarTerminos() const 
 {
-
+	for( const auto& c : this->indice ) 
+		cout << c.first << '\t' << c.second << endl;
 } 
 
 bool IndexadorHash::ListarTerminos(const string& nomDoc) const 
 {
+	unordered_map<std::string,InfDoc>::const_iterator doc = this->indiceDocs.find(nomDoc);
 
+	if( doc != this->indiceDocs.end() ) {
+		cout << nomDoc << '\t' << this->indiceDocs.at(nomDoc) << endl; // deberia printear terminos, no info
+		return true;
+	}
+	return false;
 } 
 
 void IndexadorHash::ListarDocs() const 
 {
-
+	for( const auto& d : this->indiceDocs ) 
+		cout << d.first << '\t' << d.second << endl;
 } 
 
 bool IndexadorHash::ListarDocs(const string& nomDoc) const 
