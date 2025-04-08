@@ -10,6 +10,9 @@ OBJ = $(patsubst %,$(LIBDIR)/%,$(_OBJ))
 
 all: indexador
 
+memory: indexador
+	$(CC) $(OPTIONS) $(DEBUG) src/memory.cpp -o memory
+
 indexador: src/main.cpp $(OBJ)
 	$(CC) $(OPTIONS) $(DEBUG) -I$(INCLUDEDIR) src/main.cpp $(OBJ) -o indexador
 

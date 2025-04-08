@@ -123,7 +123,6 @@ InfDoc& InfDoc::operator=(const InfDoc& o)
 
 void InfDoc::clear() 
 {
-	idDoc = 0;
 	numPal = numPalSinParada = numPalDiferentes = tamBytes = 0;
 	fechaModificacion = { 0, 0, 0, 0, 0, 0 };
 }
@@ -175,15 +174,27 @@ void InfColeccionDocs::clear ()
 	this->tamBytes = 0;
 }
 
-void InfColeccionDocs::clearDoc(const InfDoc& doc) {
+InfColeccionDocs& InfColeccionDocs::operator+=(const InfDoc& doc) 
+{
+	this->numDocs++;
+	this->numTotalPal += doc.numPal;
+	this->numTotalPalSinParada += doc.numPalSinParada;
+	this->numTotalPalDiferentes += doc.numPalDiferentes;
+	this->tamBytes += doc.tamBytes;
 
+	return *this;
+}
+
+InfColeccionDocs& InfColeccionDocs::operator-=(const InfDoc& doc) 
+{
 	this->numDocs--;
 	this->numTotalPal -= doc.numPal;
 	this->numTotalPalSinParada -= doc.numPalSinParada;
 	this->numTotalPalDiferentes -= doc.numPalDiferentes;
 	this->tamBytes -= doc.tamBytes;
-}
 
+	return *this;
+}
 
 InformacionTerminoPregunta::InformacionTerminoPregunta () 
 {

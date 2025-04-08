@@ -46,7 +46,7 @@ class IndexadorHash {
 		// TRUE si lo consigue
 		// FALSE si no, como por falta de memoria -> ERROR, indicando el documento y término en el que se ha quedado, y deja en memoria lo que lleva
 		// Si se encuentra uno repetido (misma ruta), lo reindexa (borra y vuelve a indexar)
-		// Si su fecha es más reciente que la almacenada, no lo borra, de modo que mantiene el idDoc pero se sigue reindexando.
+		// Si su fecha de modificación es más reciente que la almacenada, no lo borra, de modo que mantiene el idDoc pero se sigue reindexando.
 
 		bool IndexarDirectorio(const string& dirAIndexar);
 		// TRUE si consigue indexar lo que contiene el directorio (y subs) dirAIndexar
@@ -177,38 +177,42 @@ class IndexadorHash {
 		bool ListarDocs(const string& nomDoc) const; 
 		// Devuelve true si nomDoc existe en la colecci�n y muestra por pantalla el contenido del campo privado "indiceDocs" para el documento con nombre "nomDoc": cout << nomDoc << '\t' << InfDoc << endl; . Si no existe no se muestra nada
 
+		void clearDoc_fromIndice(const int doc);
+
 	private:
-		
-		IndexadorHash();	
+
 		// Este constructor se pone en la parte privada porque no se permitir� crear un indexador sin inicializarlo convenientemente. La inicializaci�n la decidir� el alumno
+		IndexadorHash();	
 
-		unordered_map<string, InformacionTermino> indice;	 
 		// �ndice de t�rminos indexados accesible por el t�rmino
+		unordered_map<string, InformacionTermino> indice;	 
 
-		unordered_map<string, InfDoc> indiceDocs;	 
 		// �ndice de documentos indexados accesible por el nombre del documento
-
-		InfColeccionDocs informacionColeccionDocs;	
+		unordered_map<string, InfDoc> indiceDocs;	 
+ 
 		// Informaci�n recogida de la colecci�n de documentos indexada
+		InfColeccionDocs informacionColeccionDocs;	
 
-		string pregunta;
 		// Pregunta indexada actualmente. Si no hay ninguna indexada, contendr�a el valor ""
+		string pregunta;
 
-		unordered_map<string, InformacionTerminoPregunta> indicePregunta;	 
 		// �ndice de t�rminos indexados en una pregunta
+		unordered_map<string, InformacionTerminoPregunta> indicePregunta;	 
 
-		InformacionPregunta infPregunta;	
 		// Informaci�n recogida de la pregunta indexada
+		InformacionPregunta infPregunta;	
 
-		unordered_set<string> stopWords;
 		// El filtrado de stopWords se realizará en la query y en los documentos, teniendo en cuenta minuscSinAcentos y tipoStemmer
 		// También se pasará a minuscSinAcentos el archivo de stopWords
+		unordered_set<string> stopWords;
 
-		string ficheroStopWords;
 		// Nombre del fichero que contiene las palabras de parada
+		string ficheroStopWords;
 
-		Tokenizador tok;	
 		// Tokenizador que se usar� en la indexaci�n. 
+		Tokenizador tok;	
+
+		stemmerPorter stem;
 
 		string directorioIndice;
 		// "directorioIndice" ser� el directorio del disco duro donde se almacenar� el �ndice. 

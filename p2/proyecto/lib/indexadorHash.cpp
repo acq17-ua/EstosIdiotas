@@ -3,6 +3,7 @@
 #include <sys/mman.h> 		// para memory mapping
 #include <fcntl.h> 			// para acceso a archivos
 #include <unistd.h> 		// set size of output files
+#include <time.h>			// last modified date for files
 
 constexpr unsigned char conversion[256] = 	{
 	0,   1,   2,   3,   4,   5,   6,   7,   8,   9, 
@@ -115,15 +116,16 @@ IndexadorHash::IndexadorHash(
 	this->indicePregunta 			= unordered_map<string, InformacionTerminoPregunta>();
 	this->infPregunta 				= InformacionPregunta();
 	this->ficheroStopWords 			= ficheroStopWords;
-
+	
 	unordered_set<string> stopwords;
 	if (procesarStopWords(this->ficheroStopWords, stopwords)) 
-		this->stopWords = stopwords;
+	this->stopWords = stopwords;
 	else
-		this->stopWords = unordered_set<string>();
+	this->stopWords = unordered_set<string>();
 	
 	this->directorioIndice 	= dirIndice;
 	this->tipoStemmer 		= tStemmer;
+	this->stem				= stemmerPorter(); // TODO tipo?
 	this->almacenarPosTerm 	= almPosTerm;	
 }
 
@@ -184,12 +186,129 @@ IndexadorHash& IndexadorHash::operator= (const IndexadorHash& o)
 
 bool IndexadorHash::Indexar(const string& ficheroDocumentos) 
 {
+	try {
+	this->tok.TokenizarListaFicheros(ficheroDocumentos);
 
+	// leer todos los .tk
+
+	string file, term;
+	struct stat fileInfo, fileInfoChild;
+	int fd, fd_child;
+	unsigned char* map;
+	unsigned char* map_tk;
+	int pos;
+
+	fd = open(ficheroDocumentos.c_str(), O_RDONLY);
+	
+	if( stat(ficheroDocumentos.c_str(), &fileInfo) == 0 ) {
+		
+		if(fd == -1) {
+			cerr << "Failed to read file\n";
+			return false;
+		}
+		map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
+		
+		int line_counter = 0;
+		
+		if( map == 	MAP_FAILED ) {
+			cerr << "Failed to read file\n";
+			return false;
+		}
+		// we're in the clear
+		int counter = 0, it=0;
+		for ( it = 0; it<fileInfo.st_size; it++ ) {
+
+			// a .tk file (a document)
+			if( map[it]=='\n' ) 
+			{
+				fd_child = open((file+".tk").c_str(), O_RDONLY);
+
+				if( stat((file+".tk").c_str(), &fileInfoChild) == 0 ) {
+
+					map_tk = (unsigned char*)mmap(0, fileInfoChild.st_size, PROT_READ, MAP_SHARED, fd_child, 0);
+
+					pos = 0;
+					for( int it_tk = 0; it_tk<fileInfoChild.st_size; it_tk++ ) {
+
+						// a term
+						if( map_tk[it_tk]=='\n' && term.size() > 0 ) {
+						
+							// update indice
+							// 		if term exists, add doc to InformacionTermino.l_docs
+							//			Create new InfTermDoc
+							// 		if it doesn't, create new InformacionTermino and add it to index
+
+							// update indiceDocs
+							// 		if doc exists, 
+							// 			if last changed date is the same, delete it and reindex
+							// 			if it isn't, reindex it but don't delete it first (keep idDoc)
+							// 		if it doesn't,
+							//			create new InfDoc, add it to indiceDocs
+							// update InfColeccionDocs metrics
+							// 
+
+							pos++;
+
+							// stem term
+							this->stem.stemmer(term, this->tipoStemmer);
+
+							unordered_map<string,InformacionTermino>::const_iterator inf_term = this->indice.find(term);
+
+							unordered_map<string,InfDoc>::const_iterator doc = this->indiceDocs.find(file);
+							
+							// this doc is already indexed
+							if( doc != this->indiceDocs.end() ) 
+							{
+								this->indiceDocs.at(file).clear();
+								this->clearDoc_fromIndice(doc->second.idDoc);
+
+								// has been modified since -> DON'T keep idDoc
+								if( !(doc->second.fechaModificacion == *gmtime(&fileInfoChild.st_mtime)) ) 
+									this->indiceDocs.at(file).idDoc = InfDoc::nextId++;
+							}
+
+							// check stopword TODO
+
+							// actualizar InfDoc
+							this->indiceDocs[file].numPal = 1;
+							this->indiceDocs[file].numPalSinParada = 1;
+							this->indiceDocs[file].numPalDiferentes = 1;
+							this->indiceDocs[file].tamBytes = fileInfoChild.st_size;
+
+							// actualizar InformacionTermino::l_docs -> create new InfTermDoc, 
+							//										 -> create new InformacionTermino if undefined
+							this->indice[term].l_docs[doc->second.idDoc].ft = 1;
+							this->indice[term].l_docs[doc->second.idDoc].posTerm.push_back(pos);
+
+							// actualizar InfColeccionDocs
+							this->informacionColeccionDocs += this->indiceDocs[file];
+						}
+						else
+							term += map_tk[it_tk];
+					}
+					file.clear();
+				}
+				else 
+					return false;
+			}
+			else 
+				file += map[it];
+		}
+		return true;
+	}
+	return false;
+
+	}catch( bad_alloc& ex ) {
+		return false;
+	}
 }
 
 bool IndexadorHash::IndexarDirectorio(const string& dirAIndexar) 
 {
-
+	system(("find " + dirAIndexar + " ! -type d ! -name '*.tk' > ./indexar_directorio_res.txt").c_str());
+	bool result = Indexar("indexar_directorio_res.txt");
+	system("rm ./indexar_directorio_res.txt");
+	return result;
 }
 
 bool IndexadorHash::GuardarIndexacion() const 
@@ -204,7 +323,30 @@ bool IndexadorHash::RecuperarIndexacion (const string& directorioIndexacion)
 
 bool IndexadorHash::IndexarPregunta(const string& preg) 
 {
-	// TODO
+	if( preg.size()==0 )
+		return false;
+
+	try {
+
+		list<string> tokens;
+		this->tok.Tokenizar(preg, tokens);
+		this->indicePregunta.clear();
+		short int i=0;
+
+		for( string& term : tokens ) 
+		{
+			i++;
+			this->stem.stemmer(term, this->tipoStemmer);
+			// si es la primera ocurrencia, se crea aqui el objeto
+			this->indicePregunta[term].ft++;
+			this->indicePregunta[term].posTerm.push_back(i);
+		}
+		return true;
+		
+	}catch( bad_alloc& ex ) {
+		return false;
+	}
+	
 }
 
 bool IndexadorHash::DevuelvePregunta(string& preg) const 
@@ -283,11 +425,13 @@ bool IndexadorHash::Devuelve(const string& word, const string& nomDoc, InfTermDo
 		unordered_map<std::string,InfDoc>::const_iterator doc = this->indiceDocs.find(nomDoc);
 			
 		// el documento no está indexado
-		if( doc == this->indiceDocs.end() )  	return false;
+		if( doc == this->indiceDocs.end() )  	
+			return false;
 		
 		unordered_map<std::string,InformacionTermino>::const_iterator term = this->indice.find(new_word);
 		// la palabra no está indexada
-		if( term == this->indice.end() ) 		return false;
+		if( term == this->indice.end() ) 		
+			return false;
 
 		InfTermDoc inf;
 		
@@ -344,7 +488,7 @@ bool IndexadorHash::BorraDoc(const string& nomDoc)
 		}
 
 		// Actualizar colección de documentos
-		this->informacionColeccionDocs.clearDoc(indiceDocs[nomDoc]);
+		this->informacionColeccionDocs -= indiceDocs[nomDoc];
 		
 		// Borrar el documento
 		this->indiceDocs.erase(nomDoc);
@@ -396,7 +540,10 @@ bool IndexadorHash::ListarTerminos(const string& nomDoc) const
 	unordered_map<std::string,InfDoc>::const_iterator doc = this->indiceDocs.find(nomDoc);
 
 	if( doc != this->indiceDocs.end() ) {
-		cout << nomDoc << '\t' << this->indiceDocs.at(nomDoc) << endl; // deberia printear terminos, no info
+
+		for( const auto& t : this->indiceDocs.at(nomDoc).get_terms() )
+			cout << t.first << '\t' << t.second << endl;
+
 		return true;
 	}
 	return false;
@@ -410,7 +557,20 @@ void IndexadorHash::ListarDocs() const
 
 bool IndexadorHash::ListarDocs(const string& nomDoc) const 
 {
+	unordered_map<std::string,InfDoc>::const_iterator doc = this->indiceDocs.find(nomDoc);
 
-} 
+	if( doc != this->indiceDocs.end() ) {
+		cout << nomDoc << '\t' << this->indiceDocs.at(nomDoc) << endl; 
+		return true;
+	}
+	return false;
+}
 
+void IndexadorHash::clearDoc_fromIndice(const int doc) {
 
+	for( auto& term : this->indice ) 
+	{
+		term.second.ftc -= term.second.l_docs.at(doc).ft;
+		term.second.l_docs.erase(doc);
+	}
+}

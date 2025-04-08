@@ -2,15 +2,28 @@ using namespace std;
 #include <iostream>
 #include <unordered_map>
 #include <list>
+#include <time.h>
 
+/*
 struct Fecha {
-	short int year;
-	short int month;
-	short int day;
-	short int hour;
-	short int minute;
-	short int second;
+	short unsigned int year;
+	short unsigned int month;
+	short unsigned int day;
+	short unsigned int hour;
+	short unsigned int minute;
+	short unsigned int second;
 };
+*/
+
+bool operator==(const tm& a, const tm& b) {
+
+	return 	a.tm_year 	== b.tm_year,
+			a.tm_mon 	== b.tm_mon,
+			a.tm_mday 	== b.tm_mday,
+			a.tm_hour 	== b.tm_hour,
+			a.tm_min 	== b.tm_min,
+			a.tm_sec	== b.tm_sec;
+}
 
 #ifndef _INF_TERM_DOC_
 #define _INF_TERM_DOC_
@@ -19,6 +32,8 @@ struct Fecha {
 // Solo se usará si indexadorHash.almacenarPosTerm == true
 class InfTermDoc { 
     
+	friend class IndexadorHash;
+
 	friend ostream& operator<<(ostream& s, const InfTermDoc& p) {
 		s << "ft: " << p.ft;
 		// Elementos de p.posTerm
@@ -51,6 +66,8 @@ class InfTermDoc {
 // Información sobre un término concreto en una colección de documentos
 class InformacionTermino { 
     
+	friend class IndexadorHash;
+
 	friend ostream& operator<<(ostream& s, const InformacionTermino& p) {
 		s 	<< "Frecuencia total: " << p.ftc 
 			<< "\tfd: " << p.l_docs.size();
@@ -82,7 +99,8 @@ class InformacionTermino {
 
 // Información de un documento
 class InfDoc { 
-    
+
+	friend class IndexadorHash;
 	friend class InfColeccionDocs;
 
 	friend ostream& operator<<(ostream& s, const InfDoc& p) {
@@ -102,6 +120,7 @@ class InfDoc {
 
 		void clear();
 		int get_idDoc() const { return this->idDoc; }
+		unordered_map<string,InfTermDoc&> get_terms() const { return this->l_terms; }
 
 	private:
 		static inline int nextId = 1;
@@ -110,7 +129,9 @@ class InfDoc {
 		int numPalSinParada;
 		int numPalDiferentes;
 		int tamBytes;		
-		Fecha fechaModificacion; 
+		tm fechaModificacion; 
+
+		unordered_map<string,InfTermDoc&> l_terms;
 };
 
 #endif
@@ -120,7 +141,9 @@ class InfDoc {
 
 // Información sobre una colección de documentos
 class InfColeccionDocs { 
-    
+	
+	friend class IndexadorHash;
+	
 	friend ostream& operator<<(ostream& s, const InfColeccionDocs& p) {
 		s 	<< "numDocs: " << p.numDocs 
 			<< "\tnumTotalPal: " << p.numTotalPal 
@@ -131,13 +154,14 @@ class InfColeccionDocs {
 	}
 	
 	public:
-		InfColeccionDocs (const InfColeccionDocs &);
+		InfColeccionDocs (const InfColeccionDocs&);
 		InfColeccionDocs ();
 		~InfColeccionDocs ();
-		InfColeccionDocs & operator= (const InfColeccionDocs &);
+		InfColeccionDocs& operator= (const InfColeccionDocs&);
+		InfColeccionDocs& operator+= (const InfDoc&);
+		InfColeccionDocs& operator-= (const InfDoc&);
 
 		void clear();
-		void clearDoc(const InfDoc& d);
 
 	private:
 		int numDocs;		
@@ -155,6 +179,8 @@ class InfColeccionDocs {
 // Información sobre un término concreto en una query
 // Solo usada si indexadorHash.almacenarPosTerm == true
 class InformacionTerminoPregunta { 
+
+	friend class IndexadorHash;
 
 	friend ostream& operator<<(ostream& s, const InformacionTerminoPregunta& p) {
 		s << "ft: " << p.ft;
@@ -183,6 +209,8 @@ class InformacionTerminoPregunta {
 
 class InformacionPregunta { 
     
+	friend class IndexadorHash;
+
 	friend ostream& operator<<(ostream& s, const InformacionPregunta& p) {
 		s 	<< "numTotalPal: " << p.numTotalPal 
 			<< "\tnumTotalPalSinParada: " << p.numTotalPalSinParada 
