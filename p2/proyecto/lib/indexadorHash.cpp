@@ -313,7 +313,7 @@ bool IndexadorHash::IndexarDirectorio(const string& dirAIndexar)
 
 bool IndexadorHash::GuardarIndexacion() const 
 {
-
+	
 }
 
 bool IndexadorHash::RecuperarIndexacion (const string& directorioIndexacion) 
