@@ -1,0 +1,10 @@
+{
+	"files.associations": {
+		"iostream": "cpp",
+		"random": "cpp",
+		"iosfwd": "cpp",
+		"*.tcc": "cpp",
+		"string": "cpp",
+		"unordered_map": "cpp"
+	}
+}

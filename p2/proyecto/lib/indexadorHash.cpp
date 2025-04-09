@@ -5,6 +5,7 @@
 #include <unistd.h> 		// set size of output files
 #include <time.h>			// last modified date for files
 
+const int PAGE_SIZE = sysconf(_SC_PAGE_SIZE);
 constexpr unsigned char conversion[256] = 	{
 	0,   1,   2,   3,   4,   5,   6,   7,   8,   9, 
    10,  11,  12,  13,  14,  15,  16,  17,  18,  19, 
@@ -116,13 +117,11 @@ IndexadorHash::IndexadorHash(
 	this->indicePregunta 			= unordered_map<string, InformacionTerminoPregunta>();
 	this->infPregunta 				= InformacionPregunta();
 	this->ficheroStopWords 			= ficheroStopWords;
-	
 	unordered_set<string> stopwords;
 	if (procesarStopWords(this->ficheroStopWords, stopwords)) 
-	this->stopWords = stopwords;
+		this->stopWords = stopwords;
 	else
-	this->stopWords = unordered_set<string>();
-	
+		this->stopWords = unordered_set<string>();
 	this->directorioIndice 	= dirIndice;
 	this->tipoStemmer 		= tStemmer;
 	this->stem				= stemmerPorter(); // TODO tipo?
@@ -150,21 +149,7 @@ IndexadorHash::IndexadorHash(const IndexadorHash& o)
 	this->almacenarPosTerm 			= o.almacenarPosTerm;
 }
 
-IndexadorHash::~IndexadorHash() 
-{
-	this->tok.~Tokenizador();
-	this->indice.~unordered_map(); 				
-	this->indiceDocs.~unordered_map(); 				
-	this->informacionColeccionDocs.~InfColeccionDocs();
-	this->pregunta = "";
-	this->indicePregunta.~unordered_map();
-	this->infPregunta.~InformacionPregunta();
-	this->ficheroStopWords = "";
-	this->stopWords.~unordered_set();
-	this->directorioIndice = "";
-	this->tipoStemmer = 0;
-	this->almacenarPosTerm = false;	
-}
+IndexadorHash::~IndexadorHash() {}
 
 IndexadorHash& IndexadorHash::operator= (const IndexadorHash& o) 
 {
@@ -182,6 +167,16 @@ IndexadorHash& IndexadorHash::operator= (const IndexadorHash& o)
 	this->almacenarPosTerm 			= o.almacenarPosTerm;
 
 	return *this;
+}
+
+bool operator==(const tm& a, const tm& b) {
+
+	return 	a.tm_year 	== b.tm_year,
+			a.tm_mon 	== b.tm_mon,
+			a.tm_mday 	== b.tm_mday,
+			a.tm_hour 	== b.tm_hour,
+			a.tm_min 	== b.tm_min,
+			a.tm_sec	== b.tm_sec;
 }
 
 bool IndexadorHash::Indexar(const string& ficheroDocumentos) 
@@ -217,11 +212,12 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos)
 			// we're in the clear
 			int counter = 0, it=0;
 			for ( it = 0; it<fileInfo.st_size; it++ ) {
-
+				cout << it << endl;
 				// a .tk file (a document)
 				if( map[it]=='\n' ) 
 				{
 					fd_child = open((file+".tk").c_str(), O_RDONLY);
+					cout << file+".tk" << endl;
 
 					if( stat((file+".tk").c_str(), &fileInfoChild) == 0 ) {
 
@@ -229,24 +225,12 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos)
 
 						pos = 0;
 						for( int it_tk = 0; it_tk<fileInfoChild.st_size; it_tk++ ) {
+							cout << "iteracion " << it_tk << endl;
 
 							// a term
 							if( map_tk[it_tk]=='\n' && term.size() > 0 ) {
 							
-								// update indice
-								// 		if term exists, add doc to InformacionTermino.l_docs
-								//			Create new InfTermDoc
-								// 		if it doesn't, create new InformacionTermino and add it to index
-
-								// update indiceDocs
-								// 		if doc exists, 
-								// 			if last changed date is the same, delete it and reindex
-								// 			if it isn't, reindex it but don't delete it first (keep idDoc)
-								// 		if it doesn't,
-								//			create new InfDoc, add it to indiceDocs
-								// update InfColeccionDocs metrics
-								// 
-
+								cout << "line jump: " << term << endl;
 								pos++;
 
 								// stem term
@@ -260,6 +244,7 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos)
 								if( doc != this->indiceDocs.end() ) 
 								{
 									this->indiceDocs.at(file).clear();
+									cout << "inside first if" << endl;
 									this->clearDoc_fromIndice(doc->second.idDoc);
 
 									// has been modified since -> DON'T keep idDoc
@@ -270,35 +255,47 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos)
 								// check stopword TODO
 
 								// actualizar InfDoc
+								cout << "before (creating infDoc " << file << ")" << endl;
 								this->indiceDocs[file].numPal = 1;
 								this->indiceDocs[file].numPalSinParada = 1;
 								this->indiceDocs[file].numPalDiferentes = 1;
 								this->indiceDocs[file].tamBytes = fileInfoChild.st_size;
-
+								
 								// actualizar InformacionTermino::l_docs -> create new InfTermDoc, 
 								//										 -> create new InformacionTermino if undefined
-								this->indice[term].l_docs[doc->second.idDoc].ft = 1;
-								this->indice[term].l_docs[doc->second.idDoc].posTerm.push_back(pos);
-
+								this->indice[term];
+								cout << "middle " << this->indiceDocs[file].idDoc << endl; 
+								this->indice[term].l_docs[this->indiceDocs[file].idDoc].ft = 1;
+								cout << "after" << endl;
+								this->indice[term].l_docs[this->indiceDocs[file].idDoc].posTerm.push_back(pos);
+								cout << "after2" << endl;
 								// actualizar InfColeccionDocs
 								this->informacionColeccionDocs += this->indiceDocs[file];
+								term = "";
 							}
-							else
+							else {
+								cout << "added char" << endl;
 								term += map_tk[it_tk];
+							}
+							cout << "exited" << endl;
 						}
 						file.clear();
 					}
-					else 
+					else { 
+						cout << "subfile stat returned false" << endl;
 						return false;
+					}
 				}
 				else 
 					file += map[it];
 			}
 			return true;
 		}
+		cout << "stat was wrong" << endl;
 		return false;
 
 	}catch( bad_alloc& ex ) {
+		cout << "bad_alloc exception" << endl;
 		return false;
 	}
 }
@@ -313,8 +310,9 @@ bool IndexadorHash::IndexarDirectorio(const string& dirAIndexar)
 
 /*
 	Writes natural numbers into a memory mapped file by dividing it into 255-max pieces so that they will fit into each element of the mmap.
+	Reading will have to involve adding up the character values until a 0 is found.
 	Separates with character '\0'.
-	
+
 */
 void write_int_into_mmap(unsigned char* const map, int number, int& i) 
 {
@@ -327,20 +325,30 @@ void write_int_into_mmap(unsigned char* const map, int number, int& i)
 	map[i++]=0;
 }
 
+/*
+	Saves indexation from memory into 3 folders: id, i, iq
+	· id -- Contains a file for each InfDoc in this->indiceDocs.
+	· i -- Contains a folder for each InformacionTermino in this->indice. Each one contains a __ file with metadata and a file for each InfTermDoc.
+	· iq -- Contains a file for each InformacionTerminoPregunta in this->indicePregunta, and also a __ file with metadata.
+
+*/
 bool IndexadorHash::GuardarIndexacion() const 
 {
 	try {
 		int fd, i=0;
 		struct stat fileInfo;
 		unsigned char* map;
-		string path1=this->directorioIndice, path2="";
+		string path1=this->directorioIndice, path2="", path3="";
+		unsigned memory_needed, estimated_fileSize;
 
 		// indiceDocs
 		path1.append("/id/");
 		for( const auto& doc : this->indiceDocs )
 		{
 			path2.append(path1).append(doc.first);
-			fd = open(path2.c_str(), O_RDWR);
+			fd = open(path2.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+
+			cout << "stat: " << stat(path2.c_str(), &fileInfo) << endl;
 
 			if( stat(path2.c_str(), &fileInfo) == 0 ) {
 				
@@ -348,6 +356,11 @@ bool IndexadorHash::GuardarIndexacion() const
 					cerr << "Failed to create doc file\n";
 					return false;
 				}
+
+				estimated_fileSize = this->indiceDocs.size() * 2 * sizeof(this->indiceDocs);
+				memory_needed = PAGE_SIZE*(estimated_fileSize/PAGE_SIZE + ((estimated_fileSize%PAGE_SIZE)>0)); 
+				posix_fallocate(fd, 0, memory_needed);
+
 				map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
 				
 				int line_counter = 0;
@@ -385,15 +398,23 @@ bool IndexadorHash::GuardarIndexacion() const
 		path1.append("/i/");
 		for( const auto& term : this->indice ) 
 		{
+			path2="";
+			path2.append(path1).append(term.first).append("/");
 			i=0;
+			
 			// InformacionTermino
-			path2.append(path1).append("__");
-			if( stat(path2.c_str(), &fileInfo) == 0 ) {
+			path3.append(path2).append("__");
+			if( stat(path3.c_str(), &fileInfo) == 0 ) {
 				
 				if(fd == -1) {
 					cerr << "Failed to create term file\n";
 					return false;
 				}
+
+				estimated_fileSize = this->indice.size() * 2 * sizeof(this->indice);
+				memory_needed = PAGE_SIZE*(estimated_fileSize/PAGE_SIZE + ((estimated_fileSize%PAGE_SIZE)>0)); 
+				posix_fallocate(fd, 0, memory_needed);
+
 				map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
 				
 				int line_counter = 0;
@@ -413,16 +434,22 @@ bool IndexadorHash::GuardarIndexacion() const
 			
 			// InfTermDocs
 			i=0;
+			
 			for( const auto& doc : term.second.l_docs ) 
 			{
-				path2="";
-				path2.append(path1).append(to_string(doc.first));
-				if( stat(path2.c_str(), &fileInfo) == 0 ) {
+				path3="";
+				path3.append(path2).append(to_string(doc.first));
+				if( stat(path3.c_str(), &fileInfo) == 0 ) {
 				
 					if(fd == -1) {
 						cerr << "Failed to create InfTermDocs file\n";
 						return false;
 					}
+
+					estimated_fileSize = doc.second.posTerm.size() * 2 * sizeof(doc.second.posTerm);
+					memory_needed = PAGE_SIZE*(estimated_fileSize/PAGE_SIZE + ((estimated_fileSize%PAGE_SIZE)>0)); 
+					posix_fallocate(fd, 0, memory_needed);
+
 					map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
 					
 					int line_counter = 0;
@@ -457,6 +484,11 @@ bool IndexadorHash::GuardarIndexacion() const
 				cerr << "Failed to create term file\n";
 				return false;
 			}
+
+			estimated_fileSize = sizeof(unsigned)*3;
+			memory_needed = PAGE_SIZE*(estimated_fileSize/PAGE_SIZE + ((estimated_fileSize%PAGE_SIZE)>0)); 
+			posix_fallocate(fd, 0, memory_needed);
+
 			map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
 			
 			int line_counter = 0;
@@ -488,6 +520,11 @@ bool IndexadorHash::GuardarIndexacion() const
 					cerr << "Failed to create term file\n";
 					return false;
 				}
+
+				estimated_fileSize = sizeof(unsigned) + sizeof(qterm.second.posTerm) * qterm.second.posTerm.size();
+				memory_needed = PAGE_SIZE*(estimated_fileSize/PAGE_SIZE + ((estimated_fileSize%PAGE_SIZE)>0)); 
+				posix_fallocate(fd, 0, memory_needed);
+
 				map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
 				
 				int line_counter = 0;
@@ -508,15 +545,45 @@ bool IndexadorHash::GuardarIndexacion() const
 				close(fd);
 			}
 		}
+		return true;
 	}
 	catch( bad_alloc& ex ) {
 		return false;
 	}
+
 }
 
-bool IndexadorHash::RecuperarIndexacion (const string& directorioIndexacion) 
+bool IndexadorHash::RecuperarIndexacion (const string& directorioIndexacion)
 {
+	int number;
+	int fd;
+	unsigned char* map;
+	struct stat fileInfo;
 
+	string path1="";
+
+	path1.append(directorioIndexacion).append("/id/");
+	
+
+
+	fd = open(path1.c_str(), O_RDONLY);
+
+	if( stat(path1.c_str(), &fileInfo) == 0 ) {
+		
+		if(fd == -1) {
+			cerr << "Failed to read file\n";
+			return false;
+		}
+		
+		//fileSize_input = fileInfo.st_size;
+		//map_input = reinterpret_cast<unsigned char*>(mmap(0, fileSize_input, PROT_READ, MAP_SHARED, fd_input, 0));
+		
+		if( map == MAP_FAILED ) {
+			cerr << "Failed to read file\n";
+			return false;
+		}
+	}
+	return false;
 }
 
 bool IndexadorHash::IndexarPregunta(const string& preg) 
@@ -764,11 +831,15 @@ bool IndexadorHash::ListarDocs(const string& nomDoc) const
 	return false;
 }
 
-void IndexadorHash::clearDoc_fromIndice(const int doc) {
-
-	for( auto& term : this->indice ) 
+void IndexadorHash::clearDoc_fromIndice(const int doc) 
+{
+	for( auto& term : this->indice )
 	{
-		term.second.ftc -= term.second.l_docs.at(doc).ft;
-		term.second.l_docs.erase(doc);
+		if( term.second.l_docs.find(doc) != term.second.l_docs.end() ) 
+		{
+			term.second.ftc -= term.second.l_docs.at(doc).ft;
+			term.second.l_docs.erase(doc);
+		}
+	
 	}
 }

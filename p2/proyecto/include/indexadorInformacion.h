@@ -4,17 +4,8 @@ using namespace std;
 #include <list>
 #include <time.h>
 
+// Fecha
 /*
-struct Fecha {
-	short unsigned int year;
-	short unsigned int month;
-	short unsigned int day;
-	short unsigned int hour;
-	short unsigned int minute;
-	short unsigned int second;
-};
-*/
-
 bool operator==(const tm& a, const tm& b) {
 
 	return 	a.tm_year 	== b.tm_year,
@@ -23,7 +14,7 @@ bool operator==(const tm& a, const tm& b) {
 			a.tm_hour 	== b.tm_hour,
 			a.tm_min 	== b.tm_min,
 			a.tm_sec	== b.tm_sec;
-}
+}*/
 
 #ifndef _INF_TERM_DOC_
 #define _INF_TERM_DOC_
@@ -33,6 +24,7 @@ bool operator==(const tm& a, const tm& b) {
 class InfTermDoc { 
     
 	friend class IndexadorHash;
+	friend class InformacionTermino;
 
 	friend ostream& operator<<(ostream& s, const InfTermDoc& p) {
 		s << "ft: " << p.ft;

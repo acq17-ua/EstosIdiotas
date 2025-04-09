@@ -16,7 +16,6 @@ InfTermDoc::InfTermDoc (const InfTermDoc& o)
 InfTermDoc::~InfTermDoc ()
 {
 	this->ft = 0;
-	this->posTerm.clear();
 }
 
 InfTermDoc& InfTermDoc::operator= (const InfTermDoc& o) 
@@ -36,6 +35,18 @@ InformacionTermino::InformacionTermino()
 {
 	this->ftc = 0;
 	this->l_docs = unordered_map<int,InfTermDoc>();
+	cout << "cutrcotr" << endl;
+	try {
+
+		l_docs[1] = *(new InfTermDoc());
+		cout << l_docs[1].ft << endl;
+
+	}catch( exception& ex ) {
+
+		cout << "failed at constructor:" << endl;
+		cout << ex.what() << endl;
+
+	}
 }	
 
 InformacionTermino::InformacionTermino(const InformacionTermino& o) 
@@ -47,7 +58,6 @@ InformacionTermino::InformacionTermino(const InformacionTermino& o)
 InformacionTermino::~InformacionTermino() 
 {
 	this->ftc = 0;
-	this->l_docs.clear();
 }	
 
 InformacionTermino& InformacionTermino::operator=(const InformacionTermino& o) 
@@ -88,6 +98,7 @@ bool InformacionTermino::clearDoc(const int id)
 InfDoc::InfDoc() 
 {
 	idDoc = InfDoc::nextId++;
+	cout << "new infdoc has idDoc " << idDoc << endl;
 	numPal = numPalSinParada = numPalDiferentes = tamBytes = 0;
 	fechaModificacion = { 0, 0, 0, 0, 0, 0 };
 }	
@@ -211,7 +222,6 @@ InformacionTerminoPregunta::InformacionTerminoPregunta (const InformacionTermino
 InformacionTerminoPregunta::~InformacionTerminoPregunta () 
 {
 	this->ft = 0;
-	this->posTerm.clear();
 }
 
 InformacionTerminoPregunta& InformacionTerminoPregunta::operator= (const InformacionTerminoPregunta& o) 
