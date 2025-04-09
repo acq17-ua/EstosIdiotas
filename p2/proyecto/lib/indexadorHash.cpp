@@ -187,116 +187,116 @@ IndexadorHash& IndexadorHash::operator= (const IndexadorHash& o)
 bool IndexadorHash::Indexar(const string& ficheroDocumentos) 
 {
 	try {
-	this->tok.TokenizarListaFicheros(ficheroDocumentos);
+		this->tok.TokenizarListaFicheros(ficheroDocumentos);
 
-	// leer todos los .tk
+		// leer todos los .tk
 
-	string file, term;
-	struct stat fileInfo, fileInfoChild;
-	int fd, fd_child;
-	unsigned char* map;
-	unsigned char* map_tk;
-	int pos;
+		string file, term;
+		struct stat fileInfo, fileInfoChild;
+		int fd, fd_child;
+		unsigned char* map;
+		unsigned char* map_tk;
+		int pos;
 
-	fd = open(ficheroDocumentos.c_str(), O_RDONLY);
-	
-	if( stat(ficheroDocumentos.c_str(), &fileInfo) == 0 ) {
+		fd = open(ficheroDocumentos.c_str(), O_RDONLY);
 		
-		if(fd == -1) {
-			cerr << "Failed to read file\n";
-			return false;
-		}
-		map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
-		
-		int line_counter = 0;
-		
-		if( map == 	MAP_FAILED ) {
-			cerr << "Failed to read file\n";
-			return false;
-		}
-		// we're in the clear
-		int counter = 0, it=0;
-		for ( it = 0; it<fileInfo.st_size; it++ ) {
+		if( stat(ficheroDocumentos.c_str(), &fileInfo) == 0 ) {
+			
+			if(fd == -1) {
+				cerr << "Failed to read file\n";
+				return false;
+			}
+			map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
+			
+			int line_counter = 0;
+			
+			if( map == 	MAP_FAILED ) {
+				cerr << "Failed to read file\n";
+				return false;
+			}
+			// we're in the clear
+			int counter = 0, it=0;
+			for ( it = 0; it<fileInfo.st_size; it++ ) {
 
-			// a .tk file (a document)
-			if( map[it]=='\n' ) 
-			{
-				fd_child = open((file+".tk").c_str(), O_RDONLY);
+				// a .tk file (a document)
+				if( map[it]=='\n' ) 
+				{
+					fd_child = open((file+".tk").c_str(), O_RDONLY);
 
-				if( stat((file+".tk").c_str(), &fileInfoChild) == 0 ) {
+					if( stat((file+".tk").c_str(), &fileInfoChild) == 0 ) {
 
-					map_tk = (unsigned char*)mmap(0, fileInfoChild.st_size, PROT_READ, MAP_SHARED, fd_child, 0);
+						map_tk = (unsigned char*)mmap(0, fileInfoChild.st_size, PROT_READ, MAP_SHARED, fd_child, 0);
 
-					pos = 0;
-					for( int it_tk = 0; it_tk<fileInfoChild.st_size; it_tk++ ) {
+						pos = 0;
+						for( int it_tk = 0; it_tk<fileInfoChild.st_size; it_tk++ ) {
 
-						// a term
-						if( map_tk[it_tk]=='\n' && term.size() > 0 ) {
-						
-							// update indice
-							// 		if term exists, add doc to InformacionTermino.l_docs
-							//			Create new InfTermDoc
-							// 		if it doesn't, create new InformacionTermino and add it to index
-
-							// update indiceDocs
-							// 		if doc exists, 
-							// 			if last changed date is the same, delete it and reindex
-							// 			if it isn't, reindex it but don't delete it first (keep idDoc)
-							// 		if it doesn't,
-							//			create new InfDoc, add it to indiceDocs
-							// update InfColeccionDocs metrics
-							// 
-
-							pos++;
-
-							// stem term
-							this->stem.stemmer(term, this->tipoStemmer);
-
-							unordered_map<string,InformacionTermino>::const_iterator inf_term = this->indice.find(term);
-
-							unordered_map<string,InfDoc>::const_iterator doc = this->indiceDocs.find(file);
+							// a term
+							if( map_tk[it_tk]=='\n' && term.size() > 0 ) {
 							
-							// this doc is already indexed
-							if( doc != this->indiceDocs.end() ) 
-							{
-								this->indiceDocs.at(file).clear();
-								this->clearDoc_fromIndice(doc->second.idDoc);
+								// update indice
+								// 		if term exists, add doc to InformacionTermino.l_docs
+								//			Create new InfTermDoc
+								// 		if it doesn't, create new InformacionTermino and add it to index
 
-								// has been modified since -> DON'T keep idDoc
-								if( !(doc->second.fechaModificacion == *gmtime(&fileInfoChild.st_mtime)) ) 
-									this->indiceDocs.at(file).idDoc = InfDoc::nextId++;
+								// update indiceDocs
+								// 		if doc exists, 
+								// 			if last changed date is the same, delete it and reindex
+								// 			if it isn't, reindex it but don't delete it first (keep idDoc)
+								// 		if it doesn't,
+								//			create new InfDoc, add it to indiceDocs
+								// update InfColeccionDocs metrics
+								// 
+
+								pos++;
+
+								// stem term
+								this->stem.stemmer(term, this->tipoStemmer);
+
+								unordered_map<string,InformacionTermino>::const_iterator inf_term = this->indice.find(term);
+
+								unordered_map<string,InfDoc>::const_iterator doc = this->indiceDocs.find(file);
+								
+								// this doc is already indexed
+								if( doc != this->indiceDocs.end() ) 
+								{
+									this->indiceDocs.at(file).clear();
+									this->clearDoc_fromIndice(doc->second.idDoc);
+
+									// has been modified since -> DON'T keep idDoc
+									if( !(doc->second.fechaModificacion == *gmtime(&fileInfoChild.st_mtime)) ) 
+										this->indiceDocs.at(file).idDoc = InfDoc::nextId++;
+								}
+
+								// check stopword TODO
+
+								// actualizar InfDoc
+								this->indiceDocs[file].numPal = 1;
+								this->indiceDocs[file].numPalSinParada = 1;
+								this->indiceDocs[file].numPalDiferentes = 1;
+								this->indiceDocs[file].tamBytes = fileInfoChild.st_size;
+
+								// actualizar InformacionTermino::l_docs -> create new InfTermDoc, 
+								//										 -> create new InformacionTermino if undefined
+								this->indice[term].l_docs[doc->second.idDoc].ft = 1;
+								this->indice[term].l_docs[doc->second.idDoc].posTerm.push_back(pos);
+
+								// actualizar InfColeccionDocs
+								this->informacionColeccionDocs += this->indiceDocs[file];
 							}
-
-							// check stopword TODO
-
-							// actualizar InfDoc
-							this->indiceDocs[file].numPal = 1;
-							this->indiceDocs[file].numPalSinParada = 1;
-							this->indiceDocs[file].numPalDiferentes = 1;
-							this->indiceDocs[file].tamBytes = fileInfoChild.st_size;
-
-							// actualizar InformacionTermino::l_docs -> create new InfTermDoc, 
-							//										 -> create new InformacionTermino if undefined
-							this->indice[term].l_docs[doc->second.idDoc].ft = 1;
-							this->indice[term].l_docs[doc->second.idDoc].posTerm.push_back(pos);
-
-							// actualizar InfColeccionDocs
-							this->informacionColeccionDocs += this->indiceDocs[file];
+							else
+								term += map_tk[it_tk];
 						}
-						else
-							term += map_tk[it_tk];
+						file.clear();
 					}
-					file.clear();
+					else 
+						return false;
 				}
 				else 
-					return false;
+					file += map[it];
 			}
-			else 
-				file += map[it];
+			return true;
 		}
-		return true;
-	}
-	return false;
+		return false;
 
 	}catch( bad_alloc& ex ) {
 		return false;
@@ -311,9 +311,207 @@ bool IndexadorHash::IndexarDirectorio(const string& dirAIndexar)
 	return result;
 }
 
+/*
+	Writes natural numbers into a memory mapped file by dividing it into 255-max pieces so that they will fit into each element of the mmap.
+	Separates with character '\0'.
+	
+*/
+void write_int_into_mmap(unsigned char* const map, int number, int& i) 
+{
+	map[i++] = (number < 255)*number + (255 <= number)*255;
+	number -= map[0];
+	while( number > 0 ) {
+		map[i++] = number;
+		number -= 255;
+	}
+	map[i++]=0;
+}
+
 bool IndexadorHash::GuardarIndexacion() const 
 {
+	try {
+		int fd, i=0;
+		struct stat fileInfo;
+		unsigned char* map;
+		string path1=this->directorioIndice, path2="";
+
+		// indiceDocs
+		path1.append("/id/");
+		for( const auto& doc : this->indiceDocs )
+		{
+			path2.append(path1).append(doc.first);
+			fd = open(path2.c_str(), O_RDWR);
+
+			if( stat(path2.c_str(), &fileInfo) == 0 ) {
+				
+				if(fd == -1) {
+					cerr << "Failed to create doc file\n";
+					return false;
+				}
+				map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
+				
+				int line_counter = 0;
+				
+				if( map == MAP_FAILED ) {
+					cerr << "Failed to create doc file\n";
+					return false;
+				}
+
+				write_int_into_mmap(map, doc.second.idDoc, i);
+				write_int_into_mmap(map, doc.second.numPal, i);
+				write_int_into_mmap(map, doc.second.numPalSinParada, i);
+				write_int_into_mmap(map, doc.second.numPalDiferentes, i);
+				write_int_into_mmap(map, doc.second.tamBytes, i);
+				write_int_into_mmap(map, doc.second.fechaModificacion.tm_year, i);
+				write_int_into_mmap(map, doc.second.fechaModificacion.tm_mon, i);
+				write_int_into_mmap(map, doc.second.fechaModificacion.tm_yday, i);
+				write_int_into_mmap(map, doc.second.fechaModificacion.tm_hour, i);
+				write_int_into_mmap(map, doc.second.fechaModificacion.tm_min, i);
+				write_int_into_mmap(map, doc.second.fechaModificacion.tm_sec, i);
+				
+				msync(map, i, MS_ASYNC);
+				munmap(map, i);
+				ftruncate(fd, i);
+				close(fd);
+			}
+			else {
+				cerr << "Failed to create term file\n";
+				return false;
+			}
+		}
+
+		// indice
+		path1=this->directorioIndice, path2="";
+		path1.append("/i/");
+		for( const auto& term : this->indice ) 
+		{
+			i=0;
+			// InformacionTermino
+			path2.append(path1).append("__");
+			if( stat(path2.c_str(), &fileInfo) == 0 ) {
+				
+				if(fd == -1) {
+					cerr << "Failed to create term file\n";
+					return false;
+				}
+				map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
+				
+				int line_counter = 0;
+				
+				if( map == MAP_FAILED ) {
+					cerr << "Failed to create term file\n";
+					return false;
+				}
+
+				write_int_into_mmap(map, term.second.ftc, i);
+
+				msync(map, i, MS_ASYNC);
+				munmap(map, i);
+				ftruncate(fd, i);
+				close(fd);
+			}
+			
+			// InfTermDocs
+			i=0;
+			for( const auto& doc : term.second.l_docs ) 
+			{
+				path2="";
+				path2.append(path1).append(to_string(doc.first));
+				if( stat(path2.c_str(), &fileInfo) == 0 ) {
+				
+					if(fd == -1) {
+						cerr << "Failed to create InfTermDocs file\n";
+						return false;
+					}
+					map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
+					
+					int line_counter = 0;
+					
+					if( map == MAP_FAILED ) {
+						cerr << "Failed to create InfTermDocs file\n";
+						return false;
+					}
 	
+					write_int_into_mmap(map, doc.second.ft, i);
+
+					for( const auto& posterm : doc.second.posTerm ) 
+						write_int_into_mmap(map, posterm, i);
+	
+					msync(map, i, MS_ASYNC);
+					munmap(map, i);
+					ftruncate(fd, i);
+					close(fd);
+				}
+			}
+		}
+	
+		path1 = this->directorioIndice, path2="";
+		path1.append("/iq/");
+
+		i=0;
+		// InformacionPregunta
+		path2.append(path1).append("__");
+		if( stat(path2.c_str(), &fileInfo) == 0 ) {
+			
+			if(fd == -1) {
+				cerr << "Failed to create term file\n";
+				return false;
+			}
+			map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
+			
+			int line_counter = 0;
+			
+			if( map == MAP_FAILED ) {
+				cerr << "Failed to create term file\n";
+				return false;
+			}
+
+			write_int_into_mmap(map, this->infPregunta.numTotalPal, i);
+			write_int_into_mmap(map, this->infPregunta.numTotalPalDiferentes, i);
+			write_int_into_mmap(map, this->infPregunta.numTotalPalSinParada, i);
+			
+			msync(map, i, MS_ASYNC);
+			munmap(map, i);
+			ftruncate(fd, i);
+			close(fd);
+		}
+
+		for( const auto& qterm : this->indicePregunta ) 
+		{
+			i=0;
+			// InformacionTerminoPregunta
+			path2="";
+			path2.append(path1).append(qterm.first);
+			if( stat(path2.c_str(), &fileInfo) == 0 ) {
+				
+				if(fd == -1) {
+					cerr << "Failed to create term file\n";
+					return false;
+				}
+				map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
+				
+				int line_counter = 0;
+				
+				if( map == MAP_FAILED ) {
+					cerr << "Failed to create term file\n";
+					return false;
+				}
+
+				write_int_into_mmap(map, qterm.second.ft, i);
+
+				for( const auto& posterm : qterm.second.posTerm ) 
+					write_int_into_mmap(map, posterm, i);
+
+				msync(map, i, MS_ASYNC);
+				munmap(map, i);
+				ftruncate(fd, i);
+				close(fd);
+			}
+		}
+	}
+	catch( bad_alloc& ex ) {
+		return false;
+	}
 }
 
 bool IndexadorHash::RecuperarIndexacion (const string& directorioIndexacion) 
