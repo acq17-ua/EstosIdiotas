@@ -5,6 +5,8 @@
 #include <unistd.h> 		// set size of output files
 #include <time.h>			// last modified date for files
 
+using namespace std;
+
 const int PAGE_SIZE = sysconf(_SC_PAGE_SIZE);
 constexpr unsigned char conversion[256] = 	{
 	0,   1,   2,   3,   4,   5,   6,   7,   8,   9, 
@@ -179,6 +181,84 @@ bool operator==(const tm& a, const tm& b) {
 			a.tm_sec	== b.tm_sec;
 }
 
+void write_int_into_mmap(unsigned char* const map, int number, int& i) 
+{
+	map[i++] = (number < 255)*number + (255 <= number)*255;
+	number -= map[0];
+	while( number > 0 ) {
+		map[i++] = number;
+		number -= 255;
+	}
+	map[i++]=0;
+}
+
+/*
+	Writes natural numbers into a memory mapped file by dividing it into 255-max pieces so that they will fit into each element of the mmap.
+	Reading will have to involve adding up the character values until a 0 is found.
+	Separates with character '\0'.
+
+*/
+bool write_map( const string& path, list<int>contents ) 
+{
+	int fd;
+	unsigned char* map;
+	struct stat fileInfo;
+	const unsigned estimated_size = 2*contents.size()*sizeof(unsigned char);
+	unsigned memory_needed;
+	int i=0;
+
+	// create path with parents
+	system(( "install -D /dev/null " + path).c_str());
+	fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+
+	if( fd==-1 ) {
+		cerr << "Failed to create file (errno: " << errno << ")\n";
+		return false;
+	}
+
+	if( stat(path.c_str(), &fileInfo) == 0 ) {
+				
+		if(fd == -1) {
+			cerr << "Failed to create file\n";
+			return false;
+		}
+
+		memory_needed = PAGE_SIZE*(estimated_size/PAGE_SIZE + ((estimated_size%PAGE_SIZE)>0)); 
+		posix_fallocate(fd, 0, memory_needed);
+
+		//cout << "initial size: " << fileInfo.st_size << " ; memory_needed: " << memory_needed << endl;
+		map = (unsigned char*)mmap(0, memory_needed, PROT_WRITE, MAP_SHARED, fd, 0);
+		
+		int line_counter = 0;
+		
+		if( map == MAP_FAILED ) {
+			cerr << "Failed to create file\n";
+			return false;
+		}
+
+		// actual writing
+		for( int& s : contents ) {
+			map[i++] = (s < 255)*s + (255 <= s)*255;
+			s -= map[0];
+			while( s > 0 ) {
+				map[i++] = s;
+				s -= 255;
+			}
+			map[i++]=0;
+		}
+		msync(map, i*sizeof(unsigned char), MS_ASYNC);
+		munmap(map, i*sizeof(unsigned char));
+		ftruncate(fd, i*sizeof(unsigned char));
+		close(fd);
+	}
+	else {
+		cerr << "Failed to create file\n";
+		return false;
+	}
+	contents.clear();
+	return true;
+}
+
 bool IndexadorHash::Indexar(const string& ficheroDocumentos) 
 {
 	try {
@@ -212,72 +292,70 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos)
 			// we're in the clear
 			int counter = 0, it=0;
 			for ( it = 0; it<fileInfo.st_size; it++ ) {
-				cout << it << endl;
+
 				// a .tk file (a document)
 				if( map[it]=='\n' ) 
 				{
+					cout << "*** Indexando documento " << file << endl;
+
 					fd_child = open((file+".tk").c_str(), O_RDONLY);
-					cout << file+".tk" << endl;
 
 					if( stat((file+".tk").c_str(), &fileInfoChild) == 0 ) {
-
+						
 						map_tk = (unsigned char*)mmap(0, fileInfoChild.st_size, PROT_READ, MAP_SHARED, fd_child, 0);
+						
+						if( map_tk == MAP_FAILED ) {
+							cerr << "Failed to read file\n";
+							return false;
+						}
+
+						unordered_map<string,InfDoc>::const_iterator doc = this->indiceDocs.find(file);
+						// this doc is already indexed -> clear it
+						if( doc != this->indiceDocs.end() ) 
+						{
+							this->indiceDocs.at(file).clear();
+							this->clearDoc_fromIndice(doc->second.idDoc);
+							
+							// has been modified since -> DON'T keep idDoc
+							if( !(doc->second.fechaModificacion == *gmtime(&fileInfoChild.st_mtime)) ) 
+							this->indiceDocs.at(file).idDoc = InfDoc::nextId++;
+						}
 
 						pos = 0;
 						for( int it_tk = 0; it_tk<fileInfoChild.st_size; it_tk++ ) {
-							cout << "iteracion " << it_tk << endl;
-
-							// a term
-							if( map_tk[it_tk]=='\n' && term.size() > 0 ) {
 							
-								cout << "line jump: " << term << endl;
-								pos++;
+							// a term
+							if( map_tk[it_tk]=='\n' ) {
 
-								// stem term
+								if( term.size() <= 0 ) continue;
+
+								cout << "*** Indexando término " << term << endl;
+							
+								pos++; // for posTerm
+
 								this->stem.stemmer(term, this->tipoStemmer);
 
 								unordered_map<string,InformacionTermino>::const_iterator inf_term = this->indice.find(term);
-
-								unordered_map<string,InfDoc>::const_iterator doc = this->indiceDocs.find(file);
 								
-								// this doc is already indexed
-								if( doc != this->indiceDocs.end() ) 
-								{
-									this->indiceDocs.at(file).clear();
-									cout << "inside first if" << endl;
-									this->clearDoc_fromIndice(doc->second.idDoc);
-
-									// has been modified since -> DON'T keep idDoc
-									if( !(doc->second.fechaModificacion == *gmtime(&fileInfoChild.st_mtime)) ) 
-										this->indiceDocs.at(file).idDoc = InfDoc::nextId++;
-								}
-
-								// check stopword TODO
-
 								// actualizar InfDoc
-								cout << "before (creating infDoc " << file << ")" << endl;
-								this->indiceDocs[file].numPal = 1;
-								this->indiceDocs[file].numPalSinParada = 1;
-								this->indiceDocs[file].numPalDiferentes = 1;
+								this->indiceDocs[file].numPal++;
+								this->indiceDocs[file].numPalSinParada += (this->stopWords.find(term) == this->stopWords.end());
+																			// si este término no está indexado at all || si el término no tiene el documento en l_docs
+								this->indiceDocs[file].numPalDiferentes += ((inf_term == this->indice.end()) || (inf_term->second.l_docs.find(this->indiceDocs[file].idDoc) != inf_term->second.l_docs.end()));
 								this->indiceDocs[file].tamBytes = fileInfoChild.st_size;
 								
 								// actualizar InformacionTermino::l_docs -> create new InfTermDoc, 
 								//										 -> create new InformacionTermino if undefined
 								this->indice[term];
-								cout << "middle " << this->indiceDocs[file].idDoc << endl; 
 								this->indice[term].l_docs[this->indiceDocs[file].idDoc].ft = 1;
-								cout << "after" << endl;
 								this->indice[term].l_docs[this->indiceDocs[file].idDoc].posTerm.push_back(pos);
-								cout << "after2" << endl;
 								// actualizar InfColeccionDocs
 								this->informacionColeccionDocs += this->indiceDocs[file];
 								term = "";
 							}
 							else {
-								cout << "added char" << endl;
 								term += map_tk[it_tk];
 							}
-							cout << "exited" << endl;
 						}
 						file.clear();
 					}
@@ -291,11 +369,9 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos)
 			}
 			return true;
 		}
-		cout << "stat was wrong" << endl;
 		return false;
 
 	}catch( bad_alloc& ex ) {
-		cout << "bad_alloc exception" << endl;
 		return false;
 	}
 }
@@ -308,21 +384,41 @@ bool IndexadorHash::IndexarDirectorio(const string& dirAIndexar)
 	return result;
 }
 
-/*
-	Writes natural numbers into a memory mapped file by dividing it into 255-max pieces so that they will fit into each element of the mmap.
-	Reading will have to involve adding up the character values until a 0 is found.
-	Separates with character '\0'.
-
-*/
-void write_int_into_mmap(unsigned char* const map, int number, int& i) 
+void IndexadorHash::imprimir_full() const
 {
-	map[i++] = (number < 255)*number + (255 <= number)*255;
-	number -= map[0];
-	while( number > 0 ) {
-		map[i++] = number;
-		number -= 255;
+	cout 	<< "\n\n -- INDICE -- \n";
+	
+	for( const auto& term : this->indice ) 
+	{
+		cout << term.first << " **\n";
+
+		for( const auto& l_doc : term.second.l_docs ) 
+			cout << "\t\t" << l_doc.first << "\n";
 	}
-	map[i++]=0;
+
+	cout << "\n\n -- INDICEDOCS -- \n";
+
+	for( const auto& doc : this->indiceDocs )
+	{
+		cout << doc.first << " **\n";
+
+		cout << "\t\tidDoc: " << doc.second.idDoc << "\n";
+		cout << "\t\tnumPal: " << doc.second.numPal << "\n";
+		cout << "\t\tnumPalDiferentes: " << doc.second.numPalDiferentes << "\n";
+		cout << "\t\tnumPalSinParada: " << doc.second.numPalSinParada << "\n";
+	}
+
+	cout << "\n\n -- INDICEPREGUNTA --\n";
+
+	for( const auto& qterm : this->indicePregunta )
+	{
+		cout << qterm.first << " **\n";
+		
+		cout << "\t\tft: " << qterm.second.ft << "\n";
+		for( const auto& posterm : qterm.second.posTerm )
+			cout << "\t\t" << posterm << "\n";
+	}	
+
 }
 
 /*
@@ -335,215 +431,100 @@ void write_int_into_mmap(unsigned char* const map, int number, int& i)
 bool IndexadorHash::GuardarIndexacion() const 
 {
 	try {
-		int fd, i=0;
-		struct stat fileInfo;
-		unsigned char* map;
 		string path1=this->directorioIndice, path2="", path3="";
-		unsigned memory_needed, estimated_fileSize;
+
+		list<int> contents;
 
 		// indiceDocs
 		path1.append("/id/");
+		
+		cout << "saving indiceDocs on " << path1 << endl;
+		
 		for( const auto& doc : this->indiceDocs )
 		{
+			path2="";
 			path2.append(path1).append(doc.first);
-			fd = open(path2.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 
-			cout << "stat: " << stat(path2.c_str(), &fileInfo) << endl;
+			contents.push_back(doc.second.idDoc);
+			contents.push_back(doc.second.numPal);
+			contents.push_back(doc.second.numPalSinParada);
+			contents.push_back(doc.second.numPalDiferentes);
+			contents.push_back(doc.second.tamBytes);
+			contents.push_back(doc.second.fechaModificacion.tm_year);
+			contents.push_back(doc.second.fechaModificacion.tm_mon);
+			contents.push_back(doc.second.fechaModificacion.tm_yday);
+			contents.push_back(doc.second.fechaModificacion.tm_hour);
+			contents.push_back(doc.second.fechaModificacion.tm_min);
+			contents.push_back(doc.second.fechaModificacion.tm_sec);
 
-			if( stat(path2.c_str(), &fileInfo) == 0 ) {
-				
-				if(fd == -1) {
-					cerr << "Failed to create doc file\n";
-					return false;
-				}
-
-				estimated_fileSize = this->indiceDocs.size() * 2 * sizeof(this->indiceDocs);
-				memory_needed = PAGE_SIZE*(estimated_fileSize/PAGE_SIZE + ((estimated_fileSize%PAGE_SIZE)>0)); 
-				posix_fallocate(fd, 0, memory_needed);
-
-				map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
-				
-				int line_counter = 0;
-				
-				if( map == MAP_FAILED ) {
-					cerr << "Failed to create doc file\n";
-					return false;
-				}
-
-				write_int_into_mmap(map, doc.second.idDoc, i);
-				write_int_into_mmap(map, doc.second.numPal, i);
-				write_int_into_mmap(map, doc.second.numPalSinParada, i);
-				write_int_into_mmap(map, doc.second.numPalDiferentes, i);
-				write_int_into_mmap(map, doc.second.tamBytes, i);
-				write_int_into_mmap(map, doc.second.fechaModificacion.tm_year, i);
-				write_int_into_mmap(map, doc.second.fechaModificacion.tm_mon, i);
-				write_int_into_mmap(map, doc.second.fechaModificacion.tm_yday, i);
-				write_int_into_mmap(map, doc.second.fechaModificacion.tm_hour, i);
-				write_int_into_mmap(map, doc.second.fechaModificacion.tm_min, i);
-				write_int_into_mmap(map, doc.second.fechaModificacion.tm_sec, i);
-				
-				msync(map, i, MS_ASYNC);
-				munmap(map, i);
-				ftruncate(fd, i);
-				close(fd);
-			}
-			else {
-				cerr << "Failed to create term file\n";
+			if (!write_map(	path2, contents)) 
+			{
+				cerr << "Failed to create doc file\n";
 				return false;
 			}
 		}
 
-		// indice
+		// INDICE
 		path1=this->directorioIndice, path2="";
 		path1.append("/i/");
 		for( const auto& term : this->indice ) 
 		{
+			cout << "--- on term " << term.first << " <-- len: " << term.first.size() << endl;
 			path2="";
 			path2.append(path1).append(term.first).append("/");
-			i=0;
+			cout << "second" << endl;
+			cout << "path1: " << path1 << endl;
+			cout << "path2: " << path2 << endl;
 			
 			// InformacionTermino
+			path3="";
 			path3.append(path2).append("__");
-			if( stat(path3.c_str(), &fileInfo) == 0 ) {
-				
-				if(fd == -1) {
-					cerr << "Failed to create term file\n";
-					return false;
-				}
 
-				estimated_fileSize = this->indice.size() * 2 * sizeof(this->indice);
-				memory_needed = PAGE_SIZE*(estimated_fileSize/PAGE_SIZE + ((estimated_fileSize%PAGE_SIZE)>0)); 
-				posix_fallocate(fd, 0, memory_needed);
-
-				map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
-				
-				int line_counter = 0;
-				
-				if( map == MAP_FAILED ) {
-					cerr << "Failed to create term file\n";
-					return false;
-				}
-
-				write_int_into_mmap(map, term.second.ftc, i);
-
-				msync(map, i, MS_ASYNC);
-				munmap(map, i);
-				ftruncate(fd, i);
-				close(fd);
-			}
+			contents.push_back(term.second.ftc);
+			write_map(path3, contents);
 			
 			// InfTermDocs
-			i=0;
-			
 			for( const auto& doc : term.second.l_docs ) 
 			{
 				path3="";
 				path3.append(path2).append(to_string(doc.first));
-				if( stat(path3.c_str(), &fileInfo) == 0 ) {
 				
-					if(fd == -1) {
-						cerr << "Failed to create InfTermDocs file\n";
-						return false;
-					}
-
-					estimated_fileSize = doc.second.posTerm.size() * 2 * sizeof(doc.second.posTerm);
-					memory_needed = PAGE_SIZE*(estimated_fileSize/PAGE_SIZE + ((estimated_fileSize%PAGE_SIZE)>0)); 
-					posix_fallocate(fd, 0, memory_needed);
-
-					map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
-					
-					int line_counter = 0;
-					
-					if( map == MAP_FAILED ) {
-						cerr << "Failed to create InfTermDocs file\n";
-						return false;
-					}
-	
-					write_int_into_mmap(map, doc.second.ft, i);
-
-					for( const auto& posterm : doc.second.posTerm ) 
-						write_int_into_mmap(map, posterm, i);
-	
-					msync(map, i, MS_ASYNC);
-					munmap(map, i);
-					ftruncate(fd, i);
-					close(fd);
-				}
+				for( const auto& posterm : doc.second.posTerm ) 
+					contents.push_back(posterm);
+				
+				write_map(path3, contents);
 			}
 		}
-	
+
+		// QUERY
+
 		path1 = this->directorioIndice, path2="";
 		path1.append("/iq/");
 
-		i=0;
 		// InformacionPregunta
+		path2="";
 		path2.append(path1).append("__");
-		if( stat(path2.c_str(), &fileInfo) == 0 ) {
-			
-			if(fd == -1) {
-				cerr << "Failed to create term file\n";
-				return false;
-			}
 
-			estimated_fileSize = sizeof(unsigned)*3;
-			memory_needed = PAGE_SIZE*(estimated_fileSize/PAGE_SIZE + ((estimated_fileSize%PAGE_SIZE)>0)); 
-			posix_fallocate(fd, 0, memory_needed);
+		contents.push_back(this->infPregunta.numTotalPal);
+		contents.push_back(this->infPregunta.numTotalPalDiferentes);
+		contents.push_back(this->infPregunta.numTotalPalSinParada);
 
-			map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
-			
-			int line_counter = 0;
-			
-			if( map == MAP_FAILED ) {
-				cerr << "Failed to create term file\n";
-				return false;
-			}
+		write_map(path2, contents);
 
-			write_int_into_mmap(map, this->infPregunta.numTotalPal, i);
-			write_int_into_mmap(map, this->infPregunta.numTotalPalDiferentes, i);
-			write_int_into_mmap(map, this->infPregunta.numTotalPalSinParada, i);
-			
-			msync(map, i, MS_ASYNC);
-			munmap(map, i);
-			ftruncate(fd, i);
-			close(fd);
-		}
 
 		for( const auto& qterm : this->indicePregunta ) 
 		{
-			i=0;
 			// InformacionTerminoPregunta
 			path2="";
 			path2.append(path1).append(qterm.first);
-			if( stat(path2.c_str(), &fileInfo) == 0 ) {
-				
-				if(fd == -1) {
-					cerr << "Failed to create term file\n";
-					return false;
-				}
 
-				estimated_fileSize = sizeof(unsigned) + sizeof(qterm.second.posTerm) * qterm.second.posTerm.size();
-				memory_needed = PAGE_SIZE*(estimated_fileSize/PAGE_SIZE + ((estimated_fileSize%PAGE_SIZE)>0)); 
-				posix_fallocate(fd, 0, memory_needed);
+			contents.push_back(qterm.second.ft);
 
-				map = (unsigned char*)mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
-				
-				int line_counter = 0;
-				
-				if( map == MAP_FAILED ) {
-					cerr << "Failed to create term file\n";
-					return false;
-				}
+			for( const auto& posterm : qterm.second.posTerm ) 
+				contents.push_back(posterm);
 
-				write_int_into_mmap(map, qterm.second.ft, i);
+			write_map(path2, contents);
 
-				for( const auto& posterm : qterm.second.posTerm ) 
-					write_int_into_mmap(map, posterm, i);
-
-				msync(map, i, MS_ASYNC);
-				munmap(map, i);
-				ftruncate(fd, i);
-				close(fd);
-			}
 		}
 		return true;
 	}

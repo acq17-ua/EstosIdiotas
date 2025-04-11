@@ -74,7 +74,7 @@ class IndexadorHash {
 		// Toda la parte privada se inicializará según ponga
 		// Si no existe el directorio, lanzar excepción y devolver false, dejando la indexación vacía. 
 
-		void ImprimirIndexacion() const {
+		void ImprimirIndexacion() const { // TODO
 		cout << "Terminos indexados: " << endl;
 		// A continuaci�n aparecer� un listado del contenido del campo privado "�ndice" donde para cada t�rmino indexado se imprimir�: cout << termino << '\t' << InformacionTermino << endl;
 		cout << "Documentos indexados: " << endl;
@@ -178,6 +178,8 @@ class IndexadorHash {
 		// Devuelve true si nomDoc existe en la colecci�n y muestra por pantalla el contenido del campo privado "indiceDocs" para el documento con nombre "nomDoc": cout << nomDoc << '\t' << InfDoc << endl; . Si no existe no se muestra nada
 
 		void clearDoc_fromIndice(const int doc);
+
+		void imprimir_full() const;
 
 	private:
 

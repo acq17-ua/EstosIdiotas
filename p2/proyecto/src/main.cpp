@@ -8,12 +8,14 @@ int main() {
 										",;:.-/+*\\ '\"{}[]()<>�!�?&#=\t@",
 										false,
 										true,
-										"indice",
+										"./indice",
 										1,
 										true);
 	
 	cout << ind.Indexar("listaFicheros_corto.txt") << endl;
+	ind.imprimir_full();
 	
+	//cout << ind.GuardarIndexacion() << endl;
 
 	return 0;
 }
