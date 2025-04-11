@@ -15,7 +15,7 @@ int main() {
 	cout << ind.Indexar("listaFicheros_corto.txt") << endl;
 	ind.imprimir_full();
 	
-	//cout << ind.GuardarIndexacion() << endl;
+	cout << ind.GuardarIndexacion() << endl;
 
 	return 0;
 }

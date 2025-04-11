@@ -181,82 +181,12 @@ bool operator==(const tm& a, const tm& b) {
 			a.tm_sec	== b.tm_sec;
 }
 
-void write_int_into_mmap(unsigned char* const map, int number, int& i) 
-{
-	map[i++] = (number < 255)*number + (255 <= number)*255;
-	number -= map[0];
-	while( number > 0 ) {
-		map[i++] = number;
-		number -= 255;
+void print_list(const list<int> contents) {
+	cout << "CONTENTS: ";
+	for( const int& s : contents ) {
+		cout << s << " ";
 	}
-	map[i++]=0;
-}
-
-/*
-	Writes natural numbers into a memory mapped file by dividing it into 255-max pieces so that they will fit into each element of the mmap.
-	Reading will have to involve adding up the character values until a 0 is found.
-	Separates with character '\0'.
-
-*/
-bool write_map( const string& path, list<int>contents ) 
-{
-	int fd;
-	unsigned char* map;
-	struct stat fileInfo;
-	const unsigned estimated_size = 2*contents.size()*sizeof(unsigned char);
-	unsigned memory_needed;
-	int i=0;
-
-	// create path with parents
-	system(( "install -D /dev/null " + path).c_str());
-	fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-
-	if( fd==-1 ) {
-		cerr << "Failed to create file (errno: " << errno << ")\n";
-		return false;
-	}
-
-	if( stat(path.c_str(), &fileInfo) == 0 ) {
-				
-		if(fd == -1) {
-			cerr << "Failed to create file\n";
-			return false;
-		}
-
-		memory_needed = PAGE_SIZE*(estimated_size/PAGE_SIZE + ((estimated_size%PAGE_SIZE)>0)); 
-		posix_fallocate(fd, 0, memory_needed);
-
-		//cout << "initial size: " << fileInfo.st_size << " ; memory_needed: " << memory_needed << endl;
-		map = (unsigned char*)mmap(0, memory_needed, PROT_WRITE, MAP_SHARED, fd, 0);
-		
-		int line_counter = 0;
-		
-		if( map == MAP_FAILED ) {
-			cerr << "Failed to create file\n";
-			return false;
-		}
-
-		// actual writing
-		for( int& s : contents ) {
-			map[i++] = (s < 255)*s + (255 <= s)*255;
-			s -= map[0];
-			while( s > 0 ) {
-				map[i++] = s;
-				s -= 255;
-			}
-			map[i++]=0;
-		}
-		msync(map, i*sizeof(unsigned char), MS_ASYNC);
-		munmap(map, i*sizeof(unsigned char));
-		ftruncate(fd, i*sizeof(unsigned char));
-		close(fd);
-	}
-	else {
-		cerr << "Failed to create file\n";
-		return false;
-	}
-	contents.clear();
-	return true;
+	cout << "\n";
 }
 
 bool IndexadorHash::Indexar(const string& ficheroDocumentos) 
@@ -321,6 +251,8 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos)
 							this->indiceDocs.at(file).idDoc = InfDoc::nextId++;
 						}
 
+						this->indiceDocs[file].fechaModificacion = *gmtime(&fileInfoChild.st_mtime);
+
 						pos = 0;
 						for( int it_tk = 0; it_tk<fileInfoChild.st_size; it_tk++ ) {
 							
@@ -334,9 +266,12 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos)
 								pos++; // for posTerm
 
 								this->stem.stemmer(term, this->tipoStemmer);
+								
+								// actualizar term
+								this->indice[term].ftc++;
 
 								unordered_map<string,InformacionTermino>::const_iterator inf_term = this->indice.find(term);
-								
+
 								// actualizar InfDoc
 								this->indiceDocs[file].numPal++;
 								this->indiceDocs[file].numPalSinParada += (this->stopWords.find(term) == this->stopWords.end());
@@ -347,7 +282,7 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos)
 								// actualizar InformacionTermino::l_docs -> create new InfTermDoc, 
 								//										 -> create new InformacionTermino if undefined
 								this->indice[term];
-								this->indice[term].l_docs[this->indiceDocs[file].idDoc].ft = 1;
+								this->indice[term].l_docs[this->indiceDocs[file].idDoc].ft++;
 								this->indice[term].l_docs[this->indiceDocs[file].idDoc].posTerm.push_back(pos);
 								// actualizar InfColeccionDocs
 								this->informacionColeccionDocs += this->indiceDocs[file];
@@ -431,37 +366,22 @@ void IndexadorHash::imprimir_full() const
 bool IndexadorHash::GuardarIndexacion() const 
 {
 	try {
-		string path1=this->directorioIndice, path2="", path3="";
-
+		string path1=this->directorioIndice, path2="";
 		list<int> contents;
+		FILE* output;
 
 		// indiceDocs
 		path1.append("/id/");
-		
-		cout << "saving indiceDocs on " << path1 << endl;
 		
 		for( const auto& doc : this->indiceDocs )
 		{
 			path2="";
 			path2.append(path1).append(doc.first);
+			system(( "install -D /dev/null " + path2).c_str());
 
-			contents.push_back(doc.second.idDoc);
-			contents.push_back(doc.second.numPal);
-			contents.push_back(doc.second.numPalSinParada);
-			contents.push_back(doc.second.numPalDiferentes);
-			contents.push_back(doc.second.tamBytes);
-			contents.push_back(doc.second.fechaModificacion.tm_year);
-			contents.push_back(doc.second.fechaModificacion.tm_mon);
-			contents.push_back(doc.second.fechaModificacion.tm_yday);
-			contents.push_back(doc.second.fechaModificacion.tm_hour);
-			contents.push_back(doc.second.fechaModificacion.tm_min);
-			contents.push_back(doc.second.fechaModificacion.tm_sec);
-
-			if (!write_map(	path2, contents)) 
-			{
-				cerr << "Failed to create doc file\n";
-				return false;
-			}
+			output = fopen(path2.c_str(), "w");
+			fwrite(&doc.second, sizeof(InfDoc), 1, output);
+			fclose(output);
 		}
 
 		// INDICE
@@ -469,69 +389,33 @@ bool IndexadorHash::GuardarIndexacion() const
 		path1.append("/i/");
 		for( const auto& term : this->indice ) 
 		{
-			cout << "--- on term " << term.first << " <-- len: " << term.first.size() << endl;
 			path2="";
-			path2.append(path1).append(term.first).append("/");
-			cout << "second" << endl;
-			cout << "path1: " << path1 << endl;
-			cout << "path2: " << path2 << endl;
-			
-			// InformacionTermino
-			path3="";
-			path3.append(path2).append("__");
+			path2.append(path1).append(term.first);
+			system(( "install -D /dev/null " + path2).c_str());
 
-			contents.push_back(term.second.ftc);
-			write_map(path3, contents);
-			
-			// InfTermDocs
-			for( const auto& doc : term.second.l_docs ) 
-			{
-				path3="";
-				path3.append(path2).append(to_string(doc.first));
-				
-				for( const auto& posterm : doc.second.posTerm ) 
-					contents.push_back(posterm);
-				
-				write_map(path3, contents);
-			}
+			// InformacionTermino y InfTermDoc
+			output = fopen(path2.c_str(), "w");
+			fwrite(&term.second, sizeof(InformacionTermino), 1, output);
+			fclose(output);
 		}
 
 		// QUERY
 
 		path1 = this->directorioIndice, path2="";
-		path1.append("/iq/");
+		path1.append("/iq");
 
 		// InformacionPregunta
-		path2="";
-		path2.append(path1).append("__");
+		system(( "install -D /dev/null " + path1).c_str());
 
-		contents.push_back(this->infPregunta.numTotalPal);
-		contents.push_back(this->infPregunta.numTotalPalDiferentes);
-		contents.push_back(this->infPregunta.numTotalPalSinParada);
+		output = fopen(path1.c_str(), "w");
+		fwrite(&this->indicePregunta, sizeof(InformacionPregunta), 1, output);
+		fclose(output);
 
-		write_map(path2, contents);
-
-
-		for( const auto& qterm : this->indicePregunta ) 
-		{
-			// InformacionTerminoPregunta
-			path2="";
-			path2.append(path1).append(qterm.first);
-
-			contents.push_back(qterm.second.ft);
-
-			for( const auto& posterm : qterm.second.posTerm ) 
-				contents.push_back(posterm);
-
-			write_map(path2, contents);
-
-		}
 		return true;
 	}
 	catch( bad_alloc& ex ) {
 		return false;
 	}
-
 }
 
 bool IndexadorHash::RecuperarIndexacion (const string& directorioIndexacion)
