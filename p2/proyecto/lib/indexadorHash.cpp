@@ -307,6 +307,7 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos)
 		return false;
 
 	}catch( bad_alloc& ex ) {
+		cout << "Out of memory\n";
 		return false;
 	}
 }
@@ -357,97 +358,69 @@ void IndexadorHash::imprimir_full() const
 }
 
 /*
-	Saves indexation from memory into 3 folders: id, i, iq
-	· id -- Contains a file for each InfDoc in this->indiceDocs.
-	· i -- Contains a folder for each InformacionTermino in this->indice. Each one contains a __ file with metadata and a file for each InfTermDoc.
-	· iq -- Contains a file for each InformacionTerminoPregunta in this->indicePregunta, and also a __ file with metadata.
+	Saves indexation to a single file named ./indice
 
 */
 bool IndexadorHash::GuardarIndexacion() const 
 {
 	try {
-		string path1=this->directorioIndice, path2="";
-		list<int> contents;
+		string path1=this->directorioIndice;
 		FILE* output;
+		size_t string_size;
 
-		// indiceDocs
-		path1.append("/id/");
+		path1.append("/indice");
+
+		system(( "install -D /dev/null " + path1).c_str());
+		output = fopen(path1.c_str(), "w");
 		
 		for( const auto& doc : this->indiceDocs )
 		{
-			path2="";
-			path2.append(path1).append(doc.first);
-			system(( "install -D /dev/null " + path2).c_str());
-
-			output = fopen(path2.c_str(), "w");
+			// key
+			fwrite(&doc.first, sizeof(char), doc.first.size(), output);
+			// value
 			fwrite(&doc.second, sizeof(InfDoc), 1, output);
-			fclose(output);
 		}
 
-		// INDICE
-		path1=this->directorioIndice, path2="";
-		path1.append("/i/");
 		for( const auto& term : this->indice ) 
 		{
-			path2="";
-			path2.append(path1).append(term.first);
-			system(( "install -D /dev/null " + path2).c_str());
-
-			// InformacionTermino y InfTermDoc
-			output = fopen(path2.c_str(), "w");
-			fwrite(&term.second, sizeof(InformacionTermino), 1, output);
-			fclose(output);
+			// key
+			fwrite(&term.first, sizeof(char), term.first.size(), output);
+			// value
+			fwrite(&term.second.ftc, sizeof(int), 1, output);
+			for( const auto& l_doc : term.second.l_docs ) {
+				fwrite(&l_doc.first, sizeof(int), 1, output);
+				fwrite(&l_doc.second, sizeof(InfTermDoc), 1, output);
+			}
 		}
 
-		// QUERY
+		for( const auto& qterm : this->indicePregunta )
+		{
+			// key
+			fwrite(&qterm.first, sizeof(char), qterm.first.size(), output);
+			// value
+			fwrite(&qterm.second.ft, sizeof(int), 1, output);
+			for( const auto& posterm : qterm.second.posTerm ) 
+				fwrite(&posterm, sizeof(int), 1, output);
+		}
 
-		path1 = this->directorioIndice, path2="";
-		path1.append("/iq");
-
-		// InformacionPregunta
-		system(( "install -D /dev/null " + path1).c_str());
-
-		output = fopen(path1.c_str(), "w");
 		fwrite(&this->indicePregunta, sizeof(InformacionPregunta), 1, output);
 		fclose(output);
 
 		return true;
 	}
 	catch( bad_alloc& ex ) {
+		cout << "Out of memory\n";
 		return false;
 	}
 }
 
 bool IndexadorHash::RecuperarIndexacion (const string& directorioIndexacion)
 {
-	int number;
-	int fd;
-	unsigned char* map;
-	struct stat fileInfo;
-
 	string path1="";
 
-	path1.append(directorioIndexacion).append("/id/");
-	
+		
 
 
-	fd = open(path1.c_str(), O_RDONLY);
-
-	if( stat(path1.c_str(), &fileInfo) == 0 ) {
-		
-		if(fd == -1) {
-			cerr << "Failed to read file\n";
-			return false;
-		}
-		
-		//fileSize_input = fileInfo.st_size;
-		//map_input = reinterpret_cast<unsigned char*>(mmap(0, fileSize_input, PROT_READ, MAP_SHARED, fd_input, 0));
-		
-		if( map == MAP_FAILED ) {
-			cerr << "Failed to read file\n";
-			return false;
-		}
-	}
 	return false;
 }
 
