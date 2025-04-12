@@ -12,16 +12,18 @@ InfTermDoc::InfTermDoc (const InfTermDoc& o)
 	this->posTerm = o.posTerm;
 }
 
-
 InfTermDoc::~InfTermDoc ()
 {
+	cout << "Inftermdoc destructor" << endl;
 	this->ft = 0;
+	this->posTerm.clear();
+	cout << "done" << endl;
 }
 
 InfTermDoc& InfTermDoc::operator= (const InfTermDoc& o) 
 {
 	this->ft = o.ft;
-	this->posTerm = o.posTerm;
+	this->posTerm = list<int>(o.posTerm);
 	return *this;
 }
 
@@ -46,7 +48,14 @@ InformacionTermino::InformacionTermino(const InformacionTermino& o)
 InformacionTermino::~InformacionTermino() 
 {
 	this->ftc = 0;
-}	
+	cout << "Informaciontermino destructor" << endl;
+	for( auto& l_doc : this->l_docs ) {
+		l_doc.second.ft=0;
+		l_doc.second.posTerm.clear();
+	}
+	this->l_docs.clear();
+	cout << "done" << endl;
+}
 
 InformacionTermino& InformacionTermino::operator=(const InformacionTermino& o) 
 {
@@ -102,9 +111,11 @@ InfDoc::InfDoc(const InfDoc& o)
 
 InfDoc::~InfDoc() 
 {
+	cout << "infdoc destructor" << endl;
 	idDoc = 0;
 	numPal = numPalSinParada = numPalDiferentes = tamBytes = 0;
 	fechaModificacion = { 0, 0, 0, 0, 0, 0 };
+	cout << "done" << endl;
 }
 
 InfDoc& InfDoc::operator=(const InfDoc& o) 
@@ -145,11 +156,13 @@ InfColeccionDocs::InfColeccionDocs (const InfColeccionDocs& o)
 
 InfColeccionDocs::~InfColeccionDocs () 
 {
+	cout << "infdoldocs destructor" << endl;
 	this->numDocs = 
 	this->numTotalPal = 
 	this->numTotalPalSinParada = 
 	this->numTotalPalDiferentes = 
 	this->tamBytes = 0;
+	cout << "done\n";
 }
 
 InfColeccionDocs& InfColeccionDocs::operator= (const InfColeccionDocs& o) 
@@ -194,24 +207,27 @@ InfColeccionDocs& InfColeccionDocs::operator-=(const InfDoc& doc)
 	return *this;
 }
 
-InformacionTerminoPregunta::InformacionTerminoPregunta () 
+InformacionTerminoPregunta::InformacionTerminoPregunta() 
 {
 	this->ft = 0;
 	this->posTerm = list<int>();
 }
 
-InformacionTerminoPregunta::InformacionTerminoPregunta (const InformacionTerminoPregunta& o) 
+InformacionTerminoPregunta::InformacionTerminoPregunta(const InformacionTerminoPregunta& o) 
 {
 	this->ft = o.ft;
 	this->posTerm = o.posTerm;	
 }
 
-InformacionTerminoPregunta::~InformacionTerminoPregunta () 
+InformacionTerminoPregunta::~InformacionTerminoPregunta() 
 {
+	cout << "inftermquery destructor" << endl;
 	this->ft = 0;
+	this->posTerm.clear();
+	cout << "done\n";
 }
 
-InformacionTerminoPregunta& InformacionTerminoPregunta::operator= (const InformacionTerminoPregunta& o) 
+InformacionTerminoPregunta& InformacionTerminoPregunta::operator=(const InformacionTerminoPregunta& o) 
 {
 	this->ft = o.ft;
 	this->posTerm = o.posTerm;
@@ -240,9 +256,11 @@ InformacionPregunta::InformacionPregunta(const InformacionPregunta& o)
 
 InformacionPregunta::~InformacionPregunta() 
 {
+	cout << "infquery destructor" << endl;
 	this->numTotalPal = 
 	this->numTotalPalSinParada = 
 	this->numTotalPalDiferentes = 0;
+	cout << "done\n";
 }
 
 InformacionPregunta& InformacionPregunta::operator=(const InformacionPregunta& o) 

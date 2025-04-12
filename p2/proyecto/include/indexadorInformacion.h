@@ -45,7 +45,7 @@ class InfTermDoc {
 
 	private:
 		int ft;	
-		list<int> posTerm;	
+		list<int> posTerm;		
 		// Posiciones de palabra en los que aparece el término en el documento (0 en adelante)
 		// (Las palabras de parada también se numeran, ordenadas de menor a mayor posición)
 };
@@ -112,7 +112,6 @@ class InfDoc {
 
 		void clear();
 		int get_idDoc() const { return this->idDoc; }
-		unordered_map<string,InfTermDoc&> get_terms() const { return this->l_terms; }
 
 	private:
 		static inline int nextId = 1;
@@ -122,8 +121,6 @@ class InfDoc {
 		int numPalDiferentes;
 		int tamBytes;		
 		tm fechaModificacion; 
-
-		unordered_map<string,InfTermDoc&> l_terms;
 };
 
 #endif
@@ -155,7 +152,7 @@ class InfColeccionDocs {
 
 		void clear();
 
-	private:
+		private:
 		int numDocs;		
 		int numTotalPal;	
 		int numTotalPalSinParada;

@@ -151,7 +151,18 @@ IndexadorHash::IndexadorHash(const IndexadorHash& o)
 	this->almacenarPosTerm 			= o.almacenarPosTerm;
 }
 
-IndexadorHash::~IndexadorHash() {}
+IndexadorHash::~IndexadorHash() 
+{
+	this->indice.clear();
+	this->indiceDocs.clear();
+	this->indicePregunta.clear();
+	this->informacionColeccionDocs.clear();
+	this->infPregunta.clear();
+	this->ficheroStopWords.clear();
+	this->stopWords.clear();
+	this->directorioIndice.clear();
+	this->tipoStemmer = 0;
+}
 
 IndexadorHash& IndexadorHash::operator= (const IndexadorHash& o) 
 {
@@ -253,29 +264,30 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos)
 
 						this->indiceDocs[file].fechaModificacion = *gmtime(&fileInfoChild.st_mtime);
 
+						
 						pos = 0;
 						for( int it_tk = 0; it_tk<fileInfoChild.st_size; it_tk++ ) {
 							
 							// a term
 							if( map_tk[it_tk]=='\n' ) {
-
+								
 								if( term.size() <= 0 ) continue;
-
+								
 								cout << "*** Indexando término " << term << endl;
-							
+								
 								pos++; // for posTerm
-
+								
 								this->stem.stemmer(term, this->tipoStemmer);
 								
 								// actualizar term
 								this->indice[term].ftc++;
-
+								
 								unordered_map<string,InformacionTermino>::const_iterator inf_term = this->indice.find(term);
-
+								
 								// actualizar InfDoc
 								this->indiceDocs[file].numPal++;
 								this->indiceDocs[file].numPalSinParada += (this->stopWords.find(term) == this->stopWords.end());
-																			// si este término no está indexado at all || si el término no tiene el documento en l_docs
+								// si este término no está indexado at all || si el término no tiene el documento en l_docs
 								this->indiceDocs[file].numPalDiferentes += ((inf_term == this->indice.end()) || (inf_term->second.l_docs.find(this->indiceDocs[file].idDoc) != inf_term->second.l_docs.end()));
 								this->indiceDocs[file].tamBytes = fileInfoChild.st_size;
 								
@@ -284,14 +296,14 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos)
 								this->indice[term];
 								this->indice[term].l_docs[this->indiceDocs[file].idDoc].ft++;
 								this->indice[term].l_docs[this->indiceDocs[file].idDoc].posTerm.push_back(pos);
-								// actualizar InfColeccionDocs
-								this->informacionColeccionDocs += this->indiceDocs[file];
 								term = "";
 							}
 							else {
 								term += map_tk[it_tk];
 							}
 						}
+						// actualizar InfColeccionDocs
+						this->informacionColeccionDocs += this->indiceDocs[file];
 						file.clear();
 					}
 					else { 
@@ -365,40 +377,87 @@ bool IndexadorHash::GuardarIndexacion() const
 {
 	try {
 		string path1=this->directorioIndice;
-		FILE* output;
-		size_t string_size;
+		FILE* output, test;
+		size_t obj_size, str_size;
 
 		path1.append("/indice");
+		cout << "storing into " << path1 << endl;
 
 		system(( "install -D /dev/null " + path1).c_str());
-		output = fopen(path1.c_str(), "w");
+		output = fopen(path1.c_str(), "wb");
 		
+		if( !output ) {
+			cerr << "Failed to open index file\n";
+			return false;
+		}
+
+		// informacionColeccionDocs
+		cout << "first fwrite: \n";
+		
+		// 1 ????
+	 	fwrite(&(this->informacionColeccionDocs), sizeof(InfColeccionDocs), 1, output);
+		
+		// correcto
+		//cout << "escrito: " << this->informacionColeccionDocs << endl;
+
+		// indiceDocs
+		obj_size = this->indiceDocs.size();
+		//cout << "escrito numero: " << obj_size << endl;
+		fwrite(&obj_size, sizeof(size_t), 1, output);
+
 		for( const auto& doc : this->indiceDocs )
 		{
 			// key
-			fwrite(&doc.first, sizeof(char), doc.first.size(), output);
+			str_size = doc.first.size();
+			fwrite(&str_size, sizeof(size_t), 1, output);
+			fwrite(doc.first.c_str(), sizeof(char), str_size, output);
 			// value
 			fwrite(&doc.second, sizeof(InfDoc), 1, output);
 		}
 
+		// indice
+		obj_size = this->indice.size();
+		fwrite(&obj_size, sizeof(size_t), 1, output);
 		for( const auto& term : this->indice ) 
 		{
 			// key
-			fwrite(&term.first, sizeof(char), term.first.size(), output);
+			//   string size
+			str_size = term.first.size();
+			fwrite(&str_size, sizeof(size_t), 1, output);
+			fwrite(term.first.c_str(), sizeof(char), str_size, output);
+			
 			// value
 			fwrite(&term.second.ftc, sizeof(int), 1, output);
+
+			obj_size = term.second.l_docs.size();
+;			fwrite(&obj_size, sizeof(size_t), 1, output);
 			for( const auto& l_doc : term.second.l_docs ) {
 				fwrite(&l_doc.first, sizeof(int), 1, output);
-				fwrite(&l_doc.second, sizeof(InfTermDoc), 1, output);
+				//fwrite(&l_doc.second, sizeof(InfTermDoc), 1, output);
+
+				fwrite(&l_doc.second.ft, sizeof(int), 1, output);
+
+				obj_size = l_doc.second.posTerm.size();
+				fwrite(&obj_size, sizeof(size_t), 1, output);
+				for( const auto& posterm : l_doc.second.posTerm )
+					fwrite( &posterm, sizeof(int), 1, output );
 			}
 		}
 
+		// indicePregunta
+		obj_size = this->indicePregunta.size();
+		fwrite(&obj_size, sizeof(size_t), 1, output);
 		for( const auto& qterm : this->indicePregunta )
 		{
 			// key
-			fwrite(&qterm.first, sizeof(char), qterm.first.size(), output);
+			str_size = qterm.first.size();
+			fwrite(&str_size, sizeof(size_t), 1, output);
+			fwrite(qterm.first.c_str(), sizeof(char), str_size, output);
+			
 			// value
 			fwrite(&qterm.second.ft, sizeof(int), 1, output);
+			obj_size = qterm.second.posTerm.size();
+			fwrite(&obj_size, sizeof(size_t), 1, output);
 			for( const auto& posterm : qterm.second.posTerm ) 
 				fwrite(&posterm, sizeof(int), 1, output);
 		}
@@ -416,12 +475,114 @@ bool IndexadorHash::GuardarIndexacion() const
 
 bool IndexadorHash::RecuperarIndexacion (const string& directorioIndexacion)
 {
-	string path1="";
+	string path1=directorioIndexacion;
+	FILE* input;
+	size_t obj_size, obj_size_child;
+	string key; int value, value2;
+	InformacionTermino term; InfTermDoc term_doc;
+	InfDoc doc; InformacionPregunta query;
+	int i,j;
 
+	this->indiceDocs.clear();
+	this->indice.clear();
+	this->indicePregunta.clear();
+	this->informacionColeccionDocs.clear();
+
+	path1.append("/indice");
+
+	cout << "ATTEMPTING TO READ INDEX FROM " << path1 << endl;
+
+	input = fopen(path1.c_str(), "rb");
+
+	// infColeccionDocs
+	cout << fread(&(this->informacionColeccionDocs), sizeof(InfColeccionDocs), 1, input) << endl;
+
+	// indiceDocs
+	fread(&obj_size, sizeof(size_t), 1, input);
+
+	cout << "indiceDocs size: " << obj_size << endl;
+	for( i=0; i<obj_size; i++ ) 
+	{
+		// key
+		//   string size
+		cout << fread(&obj_size_child, sizeof(size_t), 1, input) << endl;
+		fread(&key[0], sizeof(char), obj_size_child, input);
+		// value
+		fread(&doc, sizeof(InfDoc), 1, input);
 		
+		this->indiceDocs[key] = doc;
+	}
 
+	// indice
+	fread(&obj_size, sizeof(size_t), 1, input);
+	cout << "indice: read index size " << obj_size << endl;
+	for( i=0; i<obj_size; i++ ) 
+	{
+		// key
+		//   string size
+		fread(&obj_size_child, sizeof(size_t), 1, input);
+		fread(&key[0], sizeof(char), obj_size_child, input);
+		
+		// value.ftc
+		fread(&obj_size_child, sizeof(int), 1, input);
+		
+		term.ftc = obj_size_child;
+		this->indice[key] = term;
+		
+		// field of the value
+		//   size of l_docs
+		fread(&obj_size_child, sizeof(size_t), 1, input);
+		
+		// l_docs
+		for( j=0; j<obj_size_child; j++ )
+		{
+			// id
+			fread(&value, sizeof(int), 1, input);
+			this->indice[key].l_docs[value] = term_doc;
 
-	return false;
+			// ft
+			fread(&(this->indice[key].l_docs[value].ft), sizeof(int), 1, input);
+
+			// posterm.size
+			fread(&value, sizeof(size_t), 1, input);
+
+			// posterm
+			for( int k=0; k<value; k++ )
+			{
+				fread(&value2, sizeof(int), 1, input);
+				this->indice[key].l_docs[value].posTerm.push_back(value2);
+			}
+		}
+	}
+	
+	// indicePregunta
+	fread(&obj_size, sizeof(size_t), 1, input);
+	for( i=0; i<obj_size; i++ )
+	{
+
+		// key
+		fread(&obj_size_child, sizeof(size_t), 1, input);
+		fread(&key[0], sizeof(char), obj_size_child, input);
+		
+		// value
+		fread(&value, sizeof(int), 1, input);
+		this->indicePregunta[key].ft = value;
+
+		// value.posterm
+		fread(&obj_size_child, sizeof(size_t), 1, input);
+		for( j=0; j<obj_size_child; j++ )
+		{
+			fread(&value, sizeof(int), 1, input);
+			this->indicePregunta[key].posTerm.push_back(value);
+		}
+	}
+
+	fread(&(this->infPregunta), sizeof(InformacionPregunta), 1, input);
+	fclose(input);
+
+	cout << "returning true?" << endl;
+	return true;
+
 }
 
 bool IndexadorHash::IndexarPregunta(const string& preg) 
@@ -642,11 +803,15 @@ bool IndexadorHash::ListarTerminos(const string& nomDoc) const
 {
 	unordered_map<std::string,InfDoc>::const_iterator doc = this->indiceDocs.find(nomDoc);
 
-	if( doc != this->indiceDocs.end() ) {
-
-		for( const auto& t : this->indiceDocs.at(nomDoc).get_terms() )
-			cout << t.first << '\t' << t.second << endl;
-
+	if( doc != this->indiceDocs.end() ) 
+	{
+		for( const auto& term : this->indice )
+		{
+			if( term.second.l_docs.find(doc->second.idDoc) != term.second.l_docs.end() )
+			{
+				cout << term.first << '\t' << term.second << endl;
+			}
+		} 
 		return true;
 	}
 	return false;
@@ -678,6 +843,5 @@ void IndexadorHash::clearDoc_fromIndice(const int doc)
 			term.second.ftc -= term.second.l_docs.at(doc).ft;
 			term.second.l_docs.erase(doc);
 		}
-	
 	}
 }
