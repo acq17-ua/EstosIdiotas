@@ -14,10 +14,10 @@ InfTermDoc::InfTermDoc (const InfTermDoc& o)
 
 InfTermDoc::~InfTermDoc ()
 {
-	cout << "Inftermdoc destructor" << endl;
+	/* cout << "Inftermdoc destructor" << endl;
 	this->ft = 0;
 	this->posTerm.clear();
-	cout << "done" << endl;
+	cout << "done" << endl; */
 }
 
 InfTermDoc& InfTermDoc::operator= (const InfTermDoc& o) 
@@ -47,14 +47,14 @@ InformacionTermino::InformacionTermino(const InformacionTermino& o)
 
 InformacionTermino::~InformacionTermino() 
 {
-	this->ftc = 0;
+	/* this->ftc = 0;
 	cout << "Informaciontermino destructor" << endl;
 	for( auto& l_doc : this->l_docs ) {
 		l_doc.second.ft=0;
 		l_doc.second.posTerm.clear();
 	}
 	this->l_docs.clear();
-	cout << "done" << endl;
+	cout << "done" << endl; */
 }
 
 InformacionTermino& InformacionTermino::operator=(const InformacionTermino& o) 
@@ -111,11 +111,11 @@ InfDoc::InfDoc(const InfDoc& o)
 
 InfDoc::~InfDoc() 
 {
-	cout << "infdoc destructor" << endl;
+	/* cout << "infdoc destructor" << endl;
 	idDoc = 0;
 	numPal = numPalSinParada = numPalDiferentes = tamBytes = 0;
 	fechaModificacion = { 0, 0, 0, 0, 0, 0 };
-	cout << "done" << endl;
+	cout << "done" << endl; */
 }
 
 InfDoc& InfDoc::operator=(const InfDoc& o) 
@@ -156,13 +156,13 @@ InfColeccionDocs::InfColeccionDocs (const InfColeccionDocs& o)
 
 InfColeccionDocs::~InfColeccionDocs () 
 {
-	cout << "infdoldocs destructor" << endl;
+	/* cout << "infdoldocs destructor" << endl;
 	this->numDocs = 
 	this->numTotalPal = 
 	this->numTotalPalSinParada = 
 	this->numTotalPalDiferentes = 
 	this->tamBytes = 0;
-	cout << "done\n";
+	cout << "done\n"; */
 }
 
 InfColeccionDocs& InfColeccionDocs::operator= (const InfColeccionDocs& o) 
@@ -221,10 +221,10 @@ InformacionTerminoPregunta::InformacionTerminoPregunta(const InformacionTerminoP
 
 InformacionTerminoPregunta::~InformacionTerminoPregunta() 
 {
-	cout << "inftermquery destructor" << endl;
+	/* cout << "inftermquery destructor" << endl;
 	this->ft = 0;
 	this->posTerm.clear();
-	cout << "done\n";
+	cout << "done\n"; */
 }
 
 InformacionTerminoPregunta& InformacionTerminoPregunta::operator=(const InformacionTerminoPregunta& o) 
@@ -256,11 +256,11 @@ InformacionPregunta::InformacionPregunta(const InformacionPregunta& o)
 
 InformacionPregunta::~InformacionPregunta() 
 {
-	cout << "infquery destructor" << endl;
+/* 	cout << "infquery destructor" << endl;
 	this->numTotalPal = 
 	this->numTotalPalSinParada = 
 	this->numTotalPalDiferentes = 0;
-	cout << "done\n";
+	cout << "done\n"; */
 }
 
 InformacionPregunta& InformacionPregunta::operator=(const InformacionPregunta& o) 

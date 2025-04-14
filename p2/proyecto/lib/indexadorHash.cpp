@@ -4,6 +4,7 @@
 #include <fcntl.h> 			// para acceso a archivos
 #include <unistd.h> 		// set size of output files
 #include <time.h>			// last modified date for files
+#include <cstring>
 
 using namespace std;
 
@@ -153,7 +154,7 @@ IndexadorHash::IndexadorHash(const IndexadorHash& o)
 
 IndexadorHash::~IndexadorHash() 
 {
-	this->indice.clear();
+/* 	this->indice.clear();
 	this->indiceDocs.clear();
 	this->indicePregunta.clear();
 	this->informacionColeccionDocs.clear();
@@ -161,7 +162,7 @@ IndexadorHash::~IndexadorHash()
 	this->ficheroStopWords.clear();
 	this->stopWords.clear();
 	this->directorioIndice.clear();
-	this->tipoStemmer = 0;
+	this->tipoStemmer = 0; */
 }
 
 IndexadorHash& IndexadorHash::operator= (const IndexadorHash& o) 
@@ -402,13 +403,12 @@ bool IndexadorHash::GuardarIndexacion() const
 
 		// indiceDocs
 		obj_size = this->indiceDocs.size();
-		//cout << "escrito numero: " << obj_size << endl;
 		fwrite(&obj_size, sizeof(size_t), 1, output);
 
 		for( const auto& doc : this->indiceDocs )
 		{
 			// key
-			str_size = doc.first.size();
+			str_size = strlen(doc.first.c_str());
 			fwrite(&str_size, sizeof(size_t), 1, output);
 			fwrite(doc.first.c_str(), sizeof(char), str_size, output);
 			// value
@@ -417,30 +417,30 @@ bool IndexadorHash::GuardarIndexacion() const
 
 		// indice
 		obj_size = this->indice.size();
-		fwrite(&obj_size, sizeof(size_t), 1, output);
+		fwrite(&obj_size, sizeof(size_t), 1, output); 							// indice size
 		for( const auto& term : this->indice ) 
 		{
 			// key
 			//   string size
 			str_size = term.first.size();
-			fwrite(&str_size, sizeof(size_t), 1, output);
-			fwrite(term.first.c_str(), sizeof(char), str_size, output);
+			fwrite(&str_size, sizeof(size_t), 1, output); 						// term.key size
+			fwrite(term.first.c_str(), sizeof(char), str_size, output); 		// term.key
 			
 			// value
-			fwrite(&term.second.ftc, sizeof(int), 1, output);
+			fwrite(&term.second.ftc, sizeof(int), 1, output); 					// value.ftc
 
 			obj_size = term.second.l_docs.size();
-;			fwrite(&obj_size, sizeof(size_t), 1, output);
+;			fwrite(&obj_size, sizeof(size_t), 1, output); 						// value.l_docs size
 			for( const auto& l_doc : term.second.l_docs ) {
-				fwrite(&l_doc.first, sizeof(int), 1, output);
+				fwrite(&l_doc.first, sizeof(int), 1, output); 					// value.l_docs.key
 				//fwrite(&l_doc.second, sizeof(InfTermDoc), 1, output);
-
-				fwrite(&l_doc.second.ft, sizeof(int), 1, output);
+ 
+				fwrite(&l_doc.second.ft, sizeof(int), 1, output); 				// value.l_docs.value.ft
 
 				obj_size = l_doc.second.posTerm.size();
-				fwrite(&obj_size, sizeof(size_t), 1, output);
+				fwrite(&obj_size, sizeof(size_t), 1, output); 					// value.l_docs.value.posTerm size
 				for( const auto& posterm : l_doc.second.posTerm )
-					fwrite( &posterm, sizeof(int), 1, output );
+					fwrite( &posterm, sizeof(int), 1, output );					// value.l_docs.value.posTerm[i]
 			}
 		}
 
@@ -475,9 +475,10 @@ bool IndexadorHash::GuardarIndexacion() const
 
 bool IndexadorHash::RecuperarIndexacion (const string& directorioIndexacion)
 {
+	char* string_read;
 	string path1=directorioIndexacion;
 	FILE* input;
-	size_t obj_size, obj_size_child;
+	size_t obj_size, obj_size_child, obj_size_grandchild;
 	string key; int value, value2;
 	InformacionTermino term; InfTermDoc term_doc;
 	InfDoc doc; InformacionPregunta query;
@@ -490,97 +491,99 @@ bool IndexadorHash::RecuperarIndexacion (const string& directorioIndexacion)
 
 	path1.append("/indice");
 
-	cout << "ATTEMPTING TO READ INDEX FROM " << path1 << endl;
-
 	input = fopen(path1.c_str(), "rb");
 
 	// infColeccionDocs
-	cout << fread(&(this->informacionColeccionDocs), sizeof(InfColeccionDocs), 1, input) << endl;
+	fread(&(this->informacionColeccionDocs), sizeof(InfColeccionDocs), 1, input);
 
 	// indiceDocs
-	fread(&obj_size, sizeof(size_t), 1, input);
-
-	cout << "indiceDocs size: " << obj_size << endl;
+	fread(&obj_size, sizeof(size_t), 1, input); 						// indiceDocs size
+	
 	for( i=0; i<obj_size; i++ ) 
 	{
 		// key
 		//   string size
-		cout << fread(&obj_size_child, sizeof(size_t), 1, input) << endl;
-		fread(&key[0], sizeof(char), obj_size_child, input);
+		fread(&obj_size_child, sizeof(size_t), 1, input); 				// doc.key size
+		string_read = new char[obj_size_child];
+		fread(string_read, sizeof(char), obj_size_child, input); 		// doc.key
+		string_read[obj_size_child] = '\0';
 		// value
-		fread(&doc, sizeof(InfDoc), 1, input);
+		fread(&doc, sizeof(InfDoc), 1, input); 							// doc.value
 		
-		this->indiceDocs[key] = doc;
+		//this->indiceDocs[key] = doc;
+		this->indiceDocs.emplace(string_read, doc);
+		delete[] string_read;
 	}
 
 	// indice
-	fread(&obj_size, sizeof(size_t), 1, input);
-	cout << "indice: read index size " << obj_size << endl;
+	fread(&obj_size, sizeof(size_t), 1, input); 						// indice size
 	for( i=0; i<obj_size; i++ ) 
 	{
 		// key
 		//   string size
-		fread(&obj_size_child, sizeof(size_t), 1, input);
-		fread(&key[0], sizeof(char), obj_size_child, input);
-		
+		fread(&obj_size_child, sizeof(size_t), 1, input); 				// term.key size
+		string_read = new char[obj_size_child];
+		fread(string_read, sizeof(char), obj_size_child, input);		// term.key
+		string_read[obj_size_child] = '\0';
+
 		// value.ftc
-		fread(&obj_size_child, sizeof(int), 1, input);
-		
+		fread(&obj_size_child, sizeof(int), 1, input); 					// value.ftc
 		term.ftc = obj_size_child;
-		this->indice[key] = term;
-		
+
+		this->indice.emplace(string_read, term);
+
 		// field of the value
 		//   size of l_docs
-		fread(&obj_size_child, sizeof(size_t), 1, input);
+		fread(&obj_size_child, sizeof(size_t), 1, input); 				// value.l_docs size
 		
 		// l_docs
 		for( j=0; j<obj_size_child; j++ )
 		{
-			// id
-			fread(&value, sizeof(int), 1, input);
-			this->indice[key].l_docs[value] = term_doc;
-
+			fread(&value, sizeof(int), 1, input); 						// value.l_docs.key
+			this->indice.at(string_read).l_docs.emplace(value, term_doc);
+			
 			// ft
-			fread(&(this->indice[key].l_docs[value].ft), sizeof(int), 1, input);
-
+			fread(&(this->indice.at(string_read).l_docs.at(value).ft), sizeof(int), 1, input); 	// value.l_docs.value.ft
+			
 			// posterm.size
-			fread(&value, sizeof(size_t), 1, input);
-
+			fread(&obj_size_grandchild, sizeof(size_t), 1, input); 						// value.l_docs.value.posTerm size
+			
 			// posterm
-			for( int k=0; k<value; k++ )
-			{
-				fread(&value2, sizeof(int), 1, input);
-				this->indice[key].l_docs[value].posTerm.push_back(value2);
+			for( int k=0; k<obj_size_grandchild; k++ )
+			{ 	
+				fread(&value2, sizeof(int), 1, input); 									// value.l_docs.value.posTerm[i]
+				this->indice.at(string_read).l_docs.at(value).posTerm.push_back(value2);
+				//this->indice[key].l_docs[value].posTerm.push_back(value2);
 			}
 		}
+		delete[] string_read;
 	}
 	
 	// indicePregunta
 	fread(&obj_size, sizeof(size_t), 1, input);
 	for( i=0; i<obj_size; i++ )
 	{
-
 		// key
 		fread(&obj_size_child, sizeof(size_t), 1, input);
 		fread(&key[0], sizeof(char), obj_size_child, input);
 		
 		// value
 		fread(&value, sizeof(int), 1, input);
-		this->indicePregunta[key].ft = value;
+		this->indicePregunta.emplace(key, InformacionTerminoPregunta());
+		this->indicePregunta.at(key).ft = value;
 
 		// value.posterm
 		fread(&obj_size_child, sizeof(size_t), 1, input);
 		for( j=0; j<obj_size_child; j++ )
 		{
 			fread(&value, sizeof(int), 1, input);
-			this->indicePregunta[key].posTerm.push_back(value);
+			this->indicePregunta.at(key).posTerm.push_back(value);
 		}
 	}
 
 	fread(&(this->infPregunta), sizeof(InformacionPregunta), 1, input);
-	fclose(input);
+	fclose(input); // successful
 
-	cout << "returning true?" << endl;
 	return true;
 
 }
