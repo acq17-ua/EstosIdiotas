@@ -55,6 +55,10 @@ class IndexadorHash {
 		// Si se encuentra uno repetido (misma ruta), lo reindexa (borra y vuelve a indexar)
 		// Si su fecha es más reciente que la almacenada, no lo borra, de modo que mantiene el idDoc pero se sigue reindexando.
 
+		bool GuardarIndexador() const;
+		bool RecuperarIndexador(const string& directorioIndexacion);
+
+
 		bool GuardarIndexacion() const;
 		// Se guarda en el directorio contenido en this.directorioIndice la indexación que hay en memoria, incluyendo toda la parte privada y la indexación de la query
 		// El constructor de copia IndexadorHash(IndexadorHash) deberá poder leer el archivo que se genera aquí.

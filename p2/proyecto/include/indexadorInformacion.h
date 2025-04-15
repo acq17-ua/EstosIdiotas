@@ -28,8 +28,11 @@ class InfTermDoc {
 
 	friend ostream& operator<<(ostream& s, const InfTermDoc& p) {
 		s << "ft: " << p.ft;
-		// Elementos de p.posTerm
-		// << "posicion [TAB] posicion [TAB] posicion"
+		
+		for( const auto& posterm : p.posTerm )
+		{
+			cout << "\t" << posterm;
+		}
 	
 		return s;
 	}
@@ -63,7 +66,11 @@ class InformacionTermino {
 	friend ostream& operator<<(ostream& s, const InformacionTermino& p) {
 		s 	<< "Frecuencia total: " << p.ftc 
 			<< "\tfd: " << p.l_docs.size();
-		// A continuaci�n se mostrar�an todos los elementos de p.l_docs: s << "\tId.Doc: " << idDoc << "\t" << InfTermDoc;
+		
+		for( const auto& l_doc : p.l_docs )
+		{
+			s << "\tId.Doc: " << l_doc.first << "\t" << l_doc.second;
+		}
 	
 		return s;
 	}
@@ -173,8 +180,10 @@ class InformacionTerminoPregunta {
 
 	friend ostream& operator<<(ostream& s, const InformacionTerminoPregunta& p) {
 		s << "ft: " << p.ft;
-		// << "posicion [TAB] posicion [TAB] posicion" de p.posTerm
-	
+		for( const auto& posterm : p.posTerm )
+		{
+			cout << "\t" << posterm;
+		}
 		return s;
 	}
 
@@ -216,7 +225,7 @@ class InformacionPregunta {
 		void clear();
 
 	private:
-		int numTotalPal;	
+		int numTotalPal;
 		int numTotalPalSinParada;
 		int numTotalPalDiferentes;	
 };

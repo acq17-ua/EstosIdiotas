@@ -16,6 +16,13 @@ memory: indexador
 indexador: src/main.cpp $(OBJ)
 	$(CC) $(OPTIONS) $(DEBUG) -I$(INCLUDEDIR) src/main.cpp $(OBJ) -o indexador
 
+test: src/indexador10.cpp $(OBJ)
+	$(CC) $(OPTIONS) $(DEBUG) -I$(INCLUDEDIR) src/indexador10.cpp $(OBJ) -o indexador
+
+time: src/time.cpp $(OBJ)
+	$(CC) $(OPTIONS) $(DEBUG) -I$(INCLUDEDIR) src/time.cpp $(OBJ) -o time
+
+
 $(LIBDIR)/%.o : $(LIBDIR)/%.cpp $(INCLUDEDIR)/%.h
 	$(CC) $(OPTIONS) $(DEBUG) -c -I$(INCLUDEDIR) -o $@ $<
 

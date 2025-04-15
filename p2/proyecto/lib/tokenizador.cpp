@@ -88,7 +88,8 @@ Tokenizador::Tokenizador(const string& delimitadoresPalabra, const bool& kcasosE
 {
 	this->casosEspeciales = kcasosEspeciales;
 	this->pasarAminuscSinAcentos = minuscSinAcentos;
-	this->delimiters = procesar_delimitadores(delimitadoresPalabra);
+	procesar_delimitadores(delimitadoresPalabra);
+	this->delimiters = delimitadoresPalabra;
 }	
 
 Tokenizador::Tokenizador (const Tokenizador& t)
@@ -4826,13 +4827,14 @@ void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
 			for( unsigned char c : str ) {
 
 				if( this->delimitadores[c] ) { // parar aqui
-					tokens.push_back(curr_token);
+					if( curr_token.size()!=0 )
+						tokens.push_back(curr_token);
 					curr_token.clear();
 				}
 				else
 					curr_token += c;
 			}
-			if( !curr_token.empty() )
+			if( curr_token.size()!=0 )
 				tokens.push_back(curr_token);
 		}
 		else {
@@ -4842,14 +4844,16 @@ void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const
 			for( unsigned char c : str ) {
 
 				if( this->delimitadores[c] ) { // parar aqui
-					tokens.push_back(curr_token);
+
+					if( curr_token.size()!=0 )
+						tokens.push_back(curr_token);
 					curr_token.clear();
 				}
 				else
 					curr_token += conversion[c];
 
 			}
-			if( !curr_token.empty() )
+			if( curr_token.size()!=0 ) 
 				tokens.push_back(curr_token);
 		}
 	}
@@ -5041,7 +5045,7 @@ bool Tokenizador::TokenizarDirectorio (const string& i) const
 }
 
 // S
-void Tokenizador::DelimitadoresPalabra(const string& nuevodelimitadores) { this->delimiters = procesar_delimitadores(nuevodelimitadores); }
+void Tokenizador::DelimitadoresPalabra(const string& nuevodelimitadores) { procesar_delimitadores(nuevodelimitadores); this->delimiters = nuevodelimitadores; }
 
 void Tokenizador::AnyadirDelimitadoresPalabra(const string& nuevodelimitadores)
 {

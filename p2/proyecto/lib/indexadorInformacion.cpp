@@ -190,7 +190,7 @@ InfColeccionDocs& InfColeccionDocs::operator+=(const InfDoc& doc)
 	this->numDocs++;
 	this->numTotalPal += doc.numPal;
 	this->numTotalPalSinParada += doc.numPalSinParada;
-	this->numTotalPalDiferentes += doc.numPalDiferentes;
+	//this->numTotalPalDiferentes += doc.numPalDiferentes; // se actualiza al indexar un término
 	this->tamBytes += doc.tamBytes;
 
 	return *this;
@@ -201,7 +201,7 @@ InfColeccionDocs& InfColeccionDocs::operator-=(const InfDoc& doc)
 	this->numDocs--;
 	this->numTotalPal -= doc.numPal;
 	this->numTotalPalSinParada -= doc.numPalSinParada;
-	this->numTotalPalDiferentes -= doc.numPalDiferentes;
+	//this->numTotalPalDiferentes -= doc.numPalDiferentes;
 	this->tamBytes -= doc.tamBytes;
 
 	return *this;

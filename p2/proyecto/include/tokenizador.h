@@ -4,6 +4,8 @@ using namespace std;
 
 class Tokenizador {
 
+	friend class IndexadorHash;
+
 	friend ostream& operator<<(ostream&, const Tokenizador&);	 
 		// cout << "DELIMITADORES: " << delimiters << " TRATA CASOS ESPECIALES: " << casosEspeciales << " PASAR A MINUSCULAS Y SIN ACENTOS: " << pasarAminuscSinAcentos;
 		// Aunque se modifique el almacenamiento de los delimitadores por temas de eficiencia, 
@@ -98,6 +100,7 @@ class Tokenizador {
 		// Si true pasar? el token a min?sculas y quitar? acentos, antes de realizar la tokenizaci?n
 
 		bool delimitadores[256] = {0};
+
 
 		string procesar_delimitadores(string s);
 
